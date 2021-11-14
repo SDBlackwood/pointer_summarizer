@@ -204,8 +204,7 @@ class BeamSearch(object):
         return beams_sorted[0]
 
 if __name__ == '__main__':
-    #model_filename = sys.argv[1]
-    model_filename = "log/train_1636761438/model/model_5000_1636808881"
+    model_filename = sys.argv[1]
     beam_Search_processor = BeamSearch(model_filename)
     beam_Search_processor.decode()
 
