@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
+import sys
+sys.path.append(".") 
 from data_util import config
 from numpy import random
 import transformer_encoder  
@@ -119,7 +121,7 @@ class Attention(nn.Module):
             coverage_feature = self.W_c(coverage_input)  # B * t_k x 2*hidden_dim
             att_features = att_features + coverage_feature
 
-        e = F.tanh(att_features) # B * t_k x 2*hidden_dim
+        e = torch.tanh(att_features) # B * t_k x 2*hidden_dim
         scores = self.v(e)  # B * t_k x 1
         scores = scores.view(-1, t_k)  # B x t_k
 
@@ -149,7 +151,12 @@ class Decoder(nn.Module):
 
         self.x_context = nn.Linear(config.hidden_dim * 2 + config.emb_dim, config.emb_dim)
 
-        self.lstm = nn.LSTM(config.emb_dim, config.hidden_dim, num_layers=1, batch_first=True, bidirectional=False)
+        self.lstm = nn.LSTM(
+            config.emb_dim, 
+            config.hidden_dim, 
+            num_layers=1, 
+            batch_first=True, 
+            bidirectional=False)
         init_lstm_wt(self.lstm)
 
         if config.pointer_gen:
@@ -188,7 +195,7 @@ class Decoder(nn.Module):
         if config.pointer_gen:
             p_gen_input = torch.cat((c_t, s_t_hat, x), 1)  # B x (2*2*hidden_dim + emb_dim)
             p_gen = self.p_gen_linear(p_gen_input)
-            p_gen = F.sigmoid(p_gen)
+            p_gen = torch.sigmoid(p_gen)
 
         output = torch.cat((lstm_out.view(-1, config.hidden_dim), c_t), 1) # B x hidden_dim * 3
         output = self.out1(output) # B x hidden_dim

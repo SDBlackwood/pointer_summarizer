@@ -3,6 +3,7 @@ from __future__ import unicode_literals, print_function, division
 import os
 import time
 import sys
+sys.path.append(".")
 
 import tensorflow as tf
 import torch
@@ -22,13 +23,13 @@ class Evaluate(object):
         self.vocab = Vocab(config.vocab_path, config.vocab_size)
         self.batcher = Batcher(config.eval_data_path, self.vocab, mode='eval',
                                batch_size=config.batch_size, single_pass=True)
-        time.sleep(15)
+        time.sleep(1)
         model_name = os.path.basename(model_file_path)
 
         eval_dir = os.path.join(config.log_root, 'eval_%s' % (model_name))
         if not os.path.exists(eval_dir):
             os.mkdir(eval_dir)
-        self.summary_writer = tf.summary.FileWriter(eval_dir)
+        self.summary_writer = tf.summary.create_file_writer(eval_dir)
 
         self.model = Model(model_file_path, is_eval=True)
 
@@ -63,7 +64,7 @@ class Evaluate(object):
         batch_avg_loss = sum_step_losses / dec_lens_var
         loss = torch.mean(batch_avg_loss)
 
-        return loss.data[0]
+        return loss.data.item()
 
     def run_eval(self):
         running_avg_loss, iter = 0, 0
@@ -75,13 +76,11 @@ class Evaluate(object):
             running_avg_loss = calc_running_avg_loss(loss, running_avg_loss, self.summary_writer, iter)
             iter += 1
 
-            if iter % 100 == 0:
-                self.summary_writer.flush()
-            print_interval = 1000
-            if iter % print_interval == 0:
-                print('steps %d, seconds for %d batch: %.2f , loss: %f' % (
-                iter, print_interval, time.time() - start, running_avg_loss))
-                start = time.time()
+            print_interval = 10
+            start = time.time()
+            text = 'steps %d, seconds for %d batch: %.2f , loss: %f' % (iter, print_interval, time.time() - start, running_avg_loss)
+            print(text)
+            self.summary_writer.flush()
             batch = self.batcher.next_batch()
 
 

@@ -44,7 +44,7 @@ class Vocab(object):
         if w in self._word_to_id:
           raise Exception('Duplicated word in vocabulary file: %s' % w)
         self._word_to_id[w] = self._count
-        self._id_to_word[self._count] = w
+        self._id_to_word[self._count] = w.encode()
         self._count += 1
         if max_size != 0 and self._count >= max_size:
           print (f"max_size of vocab was specified as {max_size}; we now have {self._count} words. Stopping reading.")
@@ -53,9 +53,9 @@ class Vocab(object):
     print (f"Finished constructing vocabulary of {self._count} total words. Last word added: {self._id_to_word[self._count-1]}")
 
   def word2id(self, word):
-    if word not in self._word_to_id:
+    if word.decode() not in self._word_to_id:
       return self._word_to_id[UNKNOWN_TOKEN]
-    return self._word_to_id[word]
+    return self._word_to_id[word.decode()]
 
   def id2word(self, word_id):
     if word_id not in self._id_to_word:
@@ -74,9 +74,29 @@ class Vocab(object):
         writer.writerow({"word": self._id_to_word[i]})
 
 
-def example_generator(data_path, single_pass):
+def example_generator_BAK(data_path, single_pass):
   while True:
     filelist = glob.glob(data_path) # get the list of datafiles
+    assert filelist, ('Error: Empty filelist at %s' % data_path) # check filelist isn't empty
+    if single_pass:
+      filelist = sorted(filelist)
+    else:
+      random.shuffle(filelist)
+    for f in filelist:
+      reader = open(f, 'rb')
+      while True:
+        len_bytes = reader.read(8)
+        if not len_bytes: break # finished reading this file
+        str_len = struct.unpack('q', len_bytes)[0]
+        example_str = struct.unpack('%ds' % str_len, reader.read(str_len))[0]
+        yield example_pb2.Example.FromString(example_str)
+    if single_pass:
+      print("example_generator completed reading all datafiles. No more data.")
+      break
+
+def example_generator(data_path, single_pass):
+  while True:
+    filelist = glob.glob(data_path)  # get the list of datafiles
     assert filelist, ('Error: Empty filelist at %s' % data_path) # check filelist isn't empty
     if single_pass:
       filelist = sorted(filelist)

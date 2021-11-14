@@ -13,8 +13,8 @@ def print_results(article, abstract, decoded_output):
 
 
 def make_html_safe(s):
-  s.replace("<", "&lt;")
-  s.replace(">", "&gt;")
+  s.replace(b"<", b"&lt;")
+  s.replace(b">", b"&gt;")
   return s
 
 
@@ -55,10 +55,11 @@ def calc_running_avg_loss(loss, running_avg_loss, summary_writer, step, decay=0.
   else:
     running_avg_loss = running_avg_loss * decay + (1 - decay) * loss
   running_avg_loss = min(running_avg_loss, 12)  # clip
-  loss_sum = tf.Summary()
-  tag_name = 'running_avg_loss/decay=%f' % (decay)
-  loss_sum.value.add(tag=tag_name, simple_value=running_avg_loss)
-  summary_writer.add_summary(loss_sum, step)
+  with summary_writer.as_default():
+    tag_name = 'running_avg_loss/decay=%f' % (decay)
+    tf.summary.scalar(
+      tag_name, running_avg_loss, step=step, description=None
+    )
   return running_avg_loss
 
 
@@ -72,7 +73,7 @@ def write_for_rouge(reference_sents, decoded_words, ex_index,
       fst_period_idx = len(decoded_words)
     sent = decoded_words[:fst_period_idx + 1]
     decoded_words = decoded_words[fst_period_idx + 1:]
-    decoded_sents.append(' '.join(sent))
+    decoded_sents.append(b' '.join(sent))
 
   # pyrouge calls a perl script that puts the data into HTML files.
   # Therefore we need to make our output HTML safe.
@@ -84,9 +85,11 @@ def write_for_rouge(reference_sents, decoded_words, ex_index,
 
   with open(ref_file, "w") as f:
     for idx, sent in enumerate(reference_sents):
+      sent = sent.decode()
       f.write(sent) if idx == len(reference_sents) - 1 else f.write(sent + "\n")
   with open(decoded_file, "w") as f:
     for idx, sent in enumerate(decoded_sents):
+      sent = sent.decode()
       f.write(sent) if idx == len(decoded_sents) - 1 else f.write(sent + "\n")
 
   #print("Wrote example %i to file" % ex_index)

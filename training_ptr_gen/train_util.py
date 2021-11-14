@@ -36,7 +36,6 @@ def get_input_from_batch(batch, use_cuda):
 
     if coverage is not None:
       coverage = coverage.cuda()
-
   return enc_batch, enc_padding_mask, enc_lens, enc_batch_extend_vocab, extra_zeros, c_t_1, coverage
 
 def get_output_from_batch(batch, use_cuda):

@@ -4,6 +4,7 @@ from __future__ import unicode_literals, print_function, division
 import importlib
 
 import sys
+sys.path.append(".")
 
 importlib.reload(sys)
 #in py3 is hard-wired to "utf-8"
@@ -62,7 +63,7 @@ class BeamSearch(object):
         self.vocab = Vocab(config.vocab_path, config.vocab_size)
         self.batcher = Batcher(config.decode_data_path, self.vocab, mode='decode',
                                batch_size=config.beam_size, single_pass=True)
-        time.sleep(15)
+        #time.sleep(15)
 
         self.model = Model(model_file_path, is_eval=True)
 
@@ -203,7 +204,8 @@ class BeamSearch(object):
         return beams_sorted[0]
 
 if __name__ == '__main__':
-    model_filename = sys.argv[1]
+    #model_filename = sys.argv[1]
+    model_filename = "log/train_1636761438/model/model_5000_1636808881"
     beam_Search_processor = BeamSearch(model_filename)
     beam_Search_processor.decode()
 

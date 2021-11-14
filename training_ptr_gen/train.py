@@ -24,7 +24,7 @@ class Train(object):
         self.vocab = Vocab(config.vocab_path, config.vocab_size)
         self.batcher = Batcher(config.train_data_path, self.vocab, mode='train',
                                batch_size=config.batch_size, single_pass=False)
-        time.sleep(15)
+        
 
         train_dir = os.path.join(config.log_root, 'train_%d' % (int(time.time())))
         if not os.path.exists(train_dir):
@@ -34,7 +34,7 @@ class Train(object):
         if not os.path.exists(self.model_dir):
             os.mkdir(self.model_dir)
 
-        self.summary_writer = tf.summary.FileWriter(train_dir)
+        self.summary_writer = tf.summary.create_file_writer(train_dir)
 
     def save_model(self, running_avg_loss, iter):
         state = {
@@ -85,6 +85,7 @@ class Train(object):
         s_t_1 = self.model.reduce_state(encoder_hidden)
 
         step_losses = []
+        ## WHAT IS THIS SECTION OF THE CODE?
         for di in range(min(max_dec_len, config.max_dec_steps)):
             y_t_1 = dec_batch[:, di]  # Teacher forcing
             final_dist, s_t_1,  c_t_1, attn_dist, p_gen, next_coverage = self.model.decoder(y_t_1, s_t_1,
@@ -121,21 +122,25 @@ class Train(object):
         iter, running_avg_loss = self.setup_train(model_file_path)
         start = time.time()
         while iter < n_iters:
+
             batch = self.batcher.next_batch()
+            # Batches are (8,400) - 8 Rows of 400
             loss = self.train_one_batch(batch)
 
             running_avg_loss = calc_running_avg_loss(loss, running_avg_loss, self.summary_writer, iter)
             iter += 1
 
-            if iter % 100 == 0:
-                self.summary_writer.flush()
-            print_interval = 1000
-            if iter % print_interval == 0:
-                print('steps %d, seconds for %d batch: %.2f , loss: %f' % (iter, print_interval,
-                                                                           time.time() - start, loss))
+            if iter % 10 == 0:
                 start = time.time()
+                text = 'steps %d, seconds for %d batch: %.2f , loss: %f' % (iter, iter, time.time() - start, loss)
+                
+                print(text)
+                self.summary_writer.flush()
+    
             if iter % 5000 == 0:
                 self.save_model(running_avg_loss, iter)
+
+        self.save_model(running_avg_loss, iter)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Train script")
