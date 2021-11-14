@@ -1,13 +1,17 @@
 import os
 
+# Load the .env file
+from dotenv import load_dotenv
+load_dotenv()
+
 root_dir = os.path.expanduser("~")
 
 #train_data_path = os.path.join(root_dir, "ptr_nw/cnn-dailymail-master/finished_files/train.bin")
-train_data_path = os.path.join(root_dir, "ptr_nw/cnn-dailymail-master/finished_files/chunked/train_*")
-eval_data_path = os.path.join(root_dir, "ptr_nw/cnn-dailymail-master/finished_files/val.bin")
-decode_data_path = os.path.join(root_dir, "ptr_nw/cnn-dailymail-master/finished_files/test.bin")
-vocab_path = os.path.join(root_dir, "ptr_nw/cnn-dailymail-master/finished_files/vocab")
-log_root = os.path.join(root_dir, "ptr_nw/log")
+train_data_path = os.path.join(root_dir, os.getenv('train_data_path'))
+eval_data_path = os.path.join(root_dir, os.getenv('eval_data_path'))
+decode_data_path = os.path.join(root_dir, os.getenv('decode_data_path'))
+vocab_path = os.path.join(root_dir, os.getenv('vocab_path'))
+log_root = os.path.join(root_dir, os.getenv('log_root'))
 
 # Hyperparameters
 hidden_dim= 256
@@ -35,4 +39,4 @@ max_iterations = 500000
 use_gpu=True
 
 lr_coverage=0.15
-use_lstm=False
+use_lstm=True
