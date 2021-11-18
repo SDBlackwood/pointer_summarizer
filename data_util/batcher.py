@@ -197,7 +197,6 @@ class Batcher(object):
       return None
     if self._single_pass and self._finished_reading:
         print("Finished reading dataset in single_pass mode.")
-        return None
 
     batch = self._batch_queue.get() # get the next Batch
     return batch

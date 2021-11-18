@@ -1,5 +1,9 @@
 from __future__ import unicode_literals, print_function, division
 
+import sys
+sys.path.append("/home/postscript/Workspace/DS/Workspace/Project/Code/stacksumm2/training_ptr_gen")
+print(sys.path)
+
 import os
 import time
 import argparse
@@ -16,6 +20,9 @@ from data_util.batcher import Batcher
 from data_util.data import Vocab
 from data_util.utils import calc_running_avg_loss
 from train_util import get_input_from_batch, get_output_from_batch
+
+# Structured Attentions
+from structured_attention import StructuredAttention
 
 use_cuda = config.use_gpu and torch.cuda.is_available()
 
@@ -81,17 +88,35 @@ class Train(object):
 
         self.optimizer.zero_grad()
 
+        # Encoder Section
         encoder_outputs, encoder_feature, encoder_hidden = self.model.encoder(enc_batch, enc_lens, enc_padding_mask)
+        
+        # Structural Encoder Attenion Network - returns structured infused `ri` for `i` timestep
+        #encoder_sentances, sent_attention_matrix = self.model.structure_attention( encoder_outputs )
+
+        # Reduce State - inital decoder state ([1, 8, 256]),([1, 8, 256])
+        # Encoder is BiLSTM so there are 2 rows
         s_t_1 = self.model.reduce_state(encoder_hidden)
 
+        # Decoder Section
         step_losses = []
-        ## WHAT IS THIS SECTION OF THE CODE?
         for di in range(min(max_dec_len, config.max_dec_steps)):
             y_t_1 = dec_batch[:, di]  # Teacher forcing
-            final_dist, s_t_1,  c_t_1, attn_dist, p_gen, next_coverage = self.model.decoder(y_t_1, s_t_1,
-                                                        encoder_outputs, encoder_feature, enc_padding_mask, c_t_1,
-                                                        extra_zeros, enc_batch_extend_vocab,
-                                                                           coverage, di)
+
+            # Decoder step
+            final_dist, s_t_1,  c_t_1, attn_dist, p_gen, next_coverage = self.model.decoder(
+                y_t_1, 
+                s_t_1, # decoder state 
+                encoder_outputs, 
+                encoder_feature, 
+                enc_padding_mask, 
+                c_t_1,
+                extra_zeros, 
+                enc_batch_extend_vocab, 
+                coverage, 
+                di # decoder step
+            )
+
             target = target_batch[:, di]
             gold_probs = torch.gather(final_dist, 1, target.unsqueeze(1)).squeeze()
             step_loss = -torch.log(gold_probs + config.eps)
@@ -116,16 +141,21 @@ class Train(object):
 
         self.optimizer.step()
 
+        #self.summary_writer.add_graph(self.model,batch)
+
+
         return loss.item()
 
     def trainIters(self, n_iters, model_file_path=None):
         iter, running_avg_loss = self.setup_train(model_file_path)
         start = time.time()
         while iter < n_iters:
-
+    
             batch = self.batcher.next_batch()
             # Batches are (8,400) - 8 Rows of 400
             loss = self.train_one_batch(batch)
+
+
 
             running_avg_loss = calc_running_avg_loss(loss, running_avg_loss, self.summary_writer, iter)
             iter += 1

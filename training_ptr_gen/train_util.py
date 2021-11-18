@@ -18,6 +18,7 @@ def get_input_from_batch(batch, use_cuda):
     if batch.max_art_oovs > 0:
       extra_zeros = Variable(torch.zeros((batch_size, batch.max_art_oovs)))
 
+  # Inital Context Vector [8,512]
   c_t_1 = Variable(torch.zeros((batch_size, 2 * config.hidden_dim)))
 
   coverage = None
