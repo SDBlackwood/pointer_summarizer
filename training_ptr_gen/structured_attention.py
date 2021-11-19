@@ -16,9 +16,9 @@ import torch.nn as nn
 import torch
 import torch.nn.functional as F
 
-class StructuredAttention(nn.Module):
+class StructuredAttentionEncoder(nn.Module):
     def __init__(self, device, sem_dim_size, sent_hiddent_size, bidirectional, py_version):
-        super(StructuredAttention, self).__init__()
+        super(StructuredAttentionEncoder, self).__init__()
         self.device = device
         self.bidirectional = bidirectional
         self.sem_dim_size = sem_dim_size
@@ -46,6 +46,7 @@ class StructuredAttention(nn.Module):
         self.fzlinear = nn.Linear(3*self.sem_dim_size, self.sem_dim_size, bias=True)
         torch.nn.init.xavier_uniform_(self.fzlinear.weight)
         nn.init.constant_(self.fzlinear.bias, 0)
+
 
     def forward(self, input): #batch*sent * token * hidden
         batch_size, token_size, dim_size = input.size()
@@ -99,10 +100,8 @@ class StructuredAttention(nn.Module):
         # Attenion Vector scores between tokens `i` and `j`
         A_ij = torch.exp(f_ij)*mask
 
-
         tmp = torch.sum(A_ij, dim=1)
         res = torch.zeros(batch_size, token_size, token_size).to(self.device)
-
         res.as_strided(tmp.size(), [res.stride(0), res.size(2) + 1]).copy_(tmp)
         
         # L is the Laplacian matrix
@@ -131,22 +130,27 @@ class StructuredAttention(nn.Module):
         mask2 = torch.cat([temp21,temp22],1).to(self.device)
 
         dx = mask1 * tmp1 - mask2 * tmp2
-
         d = torch.cat([d0.unsqueeze(1), dx], dim = 1)
         df = d.transpose(1,2)
 
         ssr = torch.cat([self.exparam.repeat(batch_size,1,1), semantic_vector], 1)
         # Conxtext Vector gathered from possible parents of ui and ci
-        pi = torch.bmm(df, ssr)
+        si = torch.bmm(df, ssr)
         # Conxtext Vector gathered from possible children
         ci = torch.bmm(dx, semantic_vector)
 
         # `ri` is a structure infused hidden representation for each encoder timestep `i`
         # ri=tanh(Wr[ei,pi,ci]
-        ri = F.relu(
+        Wr = self.fzlinear(
+                    torch.cat(
+                        [semantic_vector, si, ci],
+                        dim = 2
+                    )
+            )
+        ri = torch.relu(
             self.fzlinear(
                     torch.cat(
-                        [semantic_vector, pi, ci],
+                        [semantic_vector, si, ci],
                         dim = 2
                     )
             )
@@ -159,7 +163,7 @@ class StructuredAttention(nn.Module):
         Shape out of the structural attention network is:
 
         - [8, 400, 50]
-        Why is the structural netwwork cutting the 3rd dimension down? 
+        Why is the structural network cutting the 3rd dimension down? 
         """
         # output = output.contiguous().view(
         #     batch_size, 
@@ -168,7 +172,63 @@ class StructuredAttention(nn.Module):
         #     output.size(2)
         # )
 
-        return ri, df
+
+        return ri, df, self.fzlinear
+
+class StructuralAttentionDecoder(nn.Module):
+    def __init__(self):
+        super(StructuralAttentionDecoder, self).__init__()
+
+    """
+    :param `ri` - A structure infused hidden representation on the encoder step
+    :param `encoder_feature` - W_s.s_t
+    """
+    def forward(
+        self, 
+        s_t_hat, 
+        encoder_outputs, 
+        encoder_feature, 
+        enc_padding_mask, 
+        coverage,
+        ri, 
+        Wr,
+        v
+    ):
+        # 8, 400, 512
+        batch, token, dim_size = list(encoder_outputs.size())
+
+        # Get Wr.ri
+        dec_fea = W_s(s_t_hat) # B x 2*hidden_dim
+        dec_fea_expanded = dec_fea.unsqueeze(1).expand(batch, token, dim_size).contiguous() # B x token x 2*hidden_dim
+        dec_fea_expanded = dec_fea_expanded.view(-1, dim_size)  # B * token x 2*hidden_dim
+
+        att_features = encoder_feature + dec_fea_expanded  # B * token x 2*hidden_dim
+
+        # Coverage
+        if config.is_coverage:
+            coverage_input = coverage.view(-1, 1)  # B * token x 1
+            coverage_feature = self.W_c(coverage_input)  # B * token x 2*hidden_dim
+            att_features = att_features + coverage_feature
+
+        # Calculate Attention
+        e = torch.tanh(att_features) # B * token x 2*hidden_dim
+        scores = v(e)  # B * token x 1
+        scores = scores.view(-1, token)  # B x token
+        attn_dist_ = F.softmax(scores, dim=1) * enc_padding_mask # B x token
+        normalization_factor = attn_dist_.sum(1, keepdim=True)
+        attn_dist = attn_dist_ / normalization_factor
+        attn_dist = attn_dist.unsqueeze(1)  # B x 1 x token
+        attn_dist = attn_dist.view(-1, token)  # B x token
+        
+        # Context Vector
+        c_t = torch.bmm(attn_dist, encoder_outputs)  # B x 1 x dim_size
+        c_t = c_t.view(-1, config.hidden_dim * 2)  # B x 2*hidden_dim
+
+        if config.is_coverage:
+            coverage = coverage.view(-1, token)
+            coverage = coverage + attn_dist
+
+        return c_t, attn_dist, coverage
 
 def b_inv(b_mat, device):
     eye = torch.rand(b_mat.size(0), b_mat.size(1), b_mat.size(2)).to(device)

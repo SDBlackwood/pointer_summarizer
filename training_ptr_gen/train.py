@@ -22,7 +22,8 @@ from data_util.utils import calc_running_avg_loss
 from train_util import get_input_from_batch, get_output_from_batch
 
 # Structured Attentions
-from structured_attention import StructuredAttention
+from structured_attention import StructuredAttentionEncoder
+from structured_attention import StructuralAttentionDecoder
 
 use_cuda = config.use_gpu and torch.cuda.is_available()
 
@@ -57,6 +58,8 @@ class Train(object):
 
     def setup_train(self, model_file_path=None):
         self.model = Model(model_file_path)
+        self.model = torch.nn.DataParallel(net, device_ids=range(torch.cuda.device_count()))
+
 
         params = list(self.model.encoder.parameters()) + list(self.model.decoder.parameters()) + \
                  list(self.model.reduce_state.parameters())
@@ -92,7 +95,8 @@ class Train(object):
         encoder_outputs, encoder_feature, encoder_hidden = self.model.encoder(enc_batch, enc_lens, enc_padding_mask)
         
         # Structural Encoder Attenion Network - returns structured infused `ri` for `i` timestep
-        #encoder_sentances, sent_attention_matrix = self.model.structure_attention( encoder_outputs )
+        # We need the Wr.ri here W
+        ri, attention_matrix, Wr = self.model.structure_attention_encoder( encoder_outputs )
 
         # Reduce State - inital decoder state ([1, 8, 256]),([1, 8, 256])
         # Encoder is BiLSTM so there are 2 rows
@@ -108,13 +112,15 @@ class Train(object):
                 y_t_1, 
                 s_t_1, # decoder state 
                 encoder_outputs, 
-                encoder_feature, 
-                enc_padding_mask, 
-                c_t_1,
+                encoder_feature, # Wh_hi
+                enc_padding_mask, # Array of 0s to denote pads
+                c_t_1, # inital context vector
                 extra_zeros, 
                 enc_batch_extend_vocab, 
                 coverage, 
-                di # decoder step
+                di, # decoder step
+                ri,
+                Wr
             )
 
             target = target_batch[:, di]
@@ -132,7 +138,6 @@ class Train(object):
         sum_losses = torch.sum(torch.stack(step_losses, 1), 1)
         batch_avg_loss = sum_losses/dec_lens_var
         loss = torch.mean(batch_avg_loss)
-
         loss.backward()
 
         self.norm = clip_grad_norm_(self.model.encoder.parameters(), config.max_grad_norm)
@@ -140,10 +145,6 @@ class Train(object):
         clip_grad_norm_(self.model.reduce_state.parameters(), config.max_grad_norm)
 
         self.optimizer.step()
-
-        #self.summary_writer.add_graph(self.model,batch)
-
-
         return loss.item()
 
     def trainIters(self, n_iters, model_file_path=None):
@@ -154,8 +155,6 @@ class Train(object):
             batch = self.batcher.next_batch()
             # Batches are (8,400) - 8 Rows of 400
             loss = self.train_one_batch(batch)
-
-
 
             running_avg_loss = calc_running_avg_loss(loss, running_avg_loss, self.summary_writer, iter)
             iter += 1
