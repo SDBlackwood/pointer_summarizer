@@ -58,8 +58,6 @@ class Train(object):
 
     def setup_train(self, model_file_path=None):
         self.model = Model(model_file_path)
-        self.model = torch.nn.DataParallel(net, device_ids=range(torch.cuda.device_count()))
-
 
         params = list(self.model.encoder.parameters()) + list(self.model.decoder.parameters()) + \
                  list(self.model.reduce_state.parameters())
