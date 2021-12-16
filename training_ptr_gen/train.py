@@ -153,6 +153,7 @@ class Train(object):
             running_avg_loss = calc_running_avg_loss(loss, running_avg_loss, self.summary_writer, iter)
             iter += 1
 
+                
             if iter % int(config.log_period) == 0:
                 elapsed = time.time() - start
                 estimated_time = ((config.max_iterations / iter) * elapsed) /60 / 60
