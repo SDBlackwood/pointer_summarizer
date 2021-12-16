@@ -154,7 +154,6 @@ class Train(object):
             iter += 1
 
             if iter % 10 == 0:
-                start = time.time()
                 text = 'steps %d, seconds for %d batch: %.2f , loss: %f' % (iter, iter, time.time() - start, loss)
                 
                 print(text)
