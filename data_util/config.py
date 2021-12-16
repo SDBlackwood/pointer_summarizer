@@ -18,7 +18,7 @@ hidden_dim = 128
 emb_dim= 64
 batch_size= 8
 max_enc_steps=200
-max_dec_steps=50
+max_dec_steps=100
 beam_size=4
 min_dec_steps=35
 vocab_size=50000
@@ -35,29 +35,24 @@ cov_loss_wt = 1.0
 
 eps = 1e-12
 max_iterations = 5000
+early_stopping = 2.5
 
 use_gpu=True
 
 lr_coverage=0.15
 use_lstm=True
 
-
 ## Structured Config
 seed=1
 py_version="1.9"
 data_file='data/yelp-2013/yelp-2013-all.pkl'
 reload_path='./saved_models/best_model.pth'
-word_emsize=128
 dim_str=50 # size of word embeddings
 dim_sem=50 #size of word embeddings
-dim_output=5 #size of word embeddings
-n_embed=200 #size of word embeddings
-d_embed=100 #size of word embeddings
 nlayers=1 #number of layers')
 dropout=0.2, # dropout applied to layers (0 = no dropout)
 clip=5, # gradient clip
 log_period=100, # log interval
-epochs=50, # epochs
 bidirectional=True
 
 # parser.add_argument('--cuda', action='store_true', default=False, help='use CUDA')
