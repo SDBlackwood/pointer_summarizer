@@ -8,7 +8,7 @@ import os
 import time
 import argparse
 
-import tensorflow as tf
+from torch.utils.tensorboard import SummaryWriter
 import torch
 from model import Model
 from torch.nn.utils import clip_grad_norm_
@@ -44,7 +44,7 @@ class Train(object):
         if not os.path.exists(self.model_dir):
             os.mkdir(self.model_dir)
 
-        self.summary_writer = tf.summary.create_file_writer(train_dir)
+        self.summary_writer = SummaryWriter(train_dir)
 
     def save_model(self, running_avg_loss, iter):
         state = {
@@ -88,50 +88,13 @@ class Train(object):
         dec_batch, dec_padding_mask, max_dec_len, dec_lens_var, target_batch = \
             get_output_from_batch(batch, use_cuda)
 
-        self.optimizer.zero_grad()
+        for param in self.model.parameters():
+            param.grad = None
 
-        # Encoder Section
-        encoder_outputs, encoder_feature, encoder_hidden, ri, attention_matrix = self.model.encoder(enc_batch, enc_lens, enc_padding_mask)
-
-        # Reduce State - inital decoder state ([1, 8, 256]),([1, 8, 256])
-        # Encoder is BiLSTM so there are 2 rows
-        s_t_1 = self.model.reduce_state(encoder_hidden)
-
-        # Decoder Section
-        step_losses = []
-        for di in range(min(max_dec_len, config.max_dec_steps)):
-            y_t_1 = dec_batch[:, di]  # Teacher forcing
-
-            # Decoder step
-            final_dist, s_t_1,  c_t_1, attn_dist, p_gen, next_coverage = self.model.decoder(
-                y_t_1, 
-                s_t_1, # decoder state 
-                encoder_outputs, 
-                encoder_feature, # Wh_hi
-                enc_padding_mask, # Array of 0s to denote pads
-                c_t_1, # inital context vector
-                extra_zeros, 
-                enc_batch_extend_vocab, 
-                coverage, 
-                di, # decoder step
-                ri
-            )
-
-            target = target_batch[:, di]
-            gold_probs = torch.gather(final_dist, 1, target.unsqueeze(1)).squeeze()
-            step_loss = -torch.log(gold_probs + config.eps)
-            if config.is_coverage:
-                step_coverage_loss = torch.sum(torch.min(attn_dist, coverage), 1)
-                step_loss = step_loss + config.cov_loss_wt * step_coverage_loss
-                coverage = next_coverage
-                
-            step_mask = dec_padding_mask[:, di]
-            step_loss = step_loss * step_mask
-            step_losses.append(step_loss)
-
-        sum_losses = torch.sum(torch.stack(step_losses, 1), 1)
-        batch_avg_loss = sum_losses/dec_lens_var
-        loss = torch.mean(batch_avg_loss)
+        loss = self.model(enc_batch, enc_padding_mask, enc_lens, enc_batch_extend_vocab, extra_zeros, c_t_1, coverage, dec_batch, dec_padding_mask, max_dec_len, dec_lens_var, target_batch )
+        # self.summary_writer.add_graph(
+        #     self.model, input_to_model=(enc_batch, enc_padding_mask, torch.from_numpy(enc_lens), enc_batch_extend_vocab, extra_zeros, c_t_1, coverage, dec_batch, dec_padding_mask, torch.tensor([max_dec_len]), dec_lens_var, target_batch), verbose=False
+        # )
         loss.backward()
 
         self.norm = clip_grad_norm_(self.model.encoder.parameters(), config.max_grad_norm)
@@ -139,6 +102,7 @@ class Train(object):
         clip_grad_norm_(self.model.reduce_state.parameters(), config.max_grad_norm)
 
         self.optimizer.step()
+
         return loss.item()
 
     def trainIters(self, n_iters, model_file_path=None):
@@ -153,8 +117,7 @@ class Train(object):
             running_avg_loss = calc_running_avg_loss(loss, running_avg_loss, self.summary_writer, iter)
             iter += 1
 
-                
-            if iter % int(config.log_period) == 0:
+            if iter % config.log_period == 0:
                 elapsed = time.time() - start
                 estimated_time = ((config.max_iterations / iter) * elapsed) /60 / 60
                 text = 'steps %d, seconds for %d batch: %.2f, loss: %f.  Estimated training time: %d hrs' % (iter, iter, time.time() - start, loss, estimated_time)  
@@ -162,7 +125,7 @@ class Train(object):
                 self.summary_writer.flush()
 
             # Stop if the loss is less than the early stopping value
-            if loss < int(config.early_stopping):
+            if loss < config.early_stopping:
                 break
     
             if iter % 5000 == 0:
