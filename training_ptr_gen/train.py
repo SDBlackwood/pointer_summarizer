@@ -1,6 +1,4 @@
 from __future__ import unicode_literals, print_function, division
-import GPUtil
-GPUtil.showUtilization()
 
 import sys
 sys.path.append("/home/postscript/Workspace/DS/Workspace/Project/Code/stacksumm2/training_ptr_gen")
@@ -83,9 +81,6 @@ class Train(object):
                                 state[k] = v.cuda()
 
         return start_iter, start_loss
-
-    def monitor_memory(self):
-        GPUtil.showUtilization()
 
     def train_one_batch(self, batch):
         enc_batch, enc_padding_mask, enc_lens, enc_batch_extend_vocab, extra_zeros, c_t_1, coverage = \
