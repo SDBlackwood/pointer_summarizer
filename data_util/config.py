@@ -52,7 +52,7 @@ dim_sem=50 #size of word embeddings
 nlayers=1 #number of layers')
 dropout=0.2, # dropout applied to layers (0 = no dropout)
 clip=5, # gradient clip
-log_period=100, # log interval
+log_period=10, # log interval
 bidirectional=True
 
 # parser.add_argument('--cuda', action='store_true', default=False, help='use CUDA')
