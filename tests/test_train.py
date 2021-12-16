@@ -1,11 +1,11 @@
+import sys
+sys.path.append(".")
 from training_ptr_gen.train import Train
 from data_util import config
 import unittest
 import torch.nn as nn
 import torch
 
-import sys
-sys.path.append(".")
 
 
 class TrainTestCase(unittest.TestCase):
@@ -15,6 +15,14 @@ class TrainTestCase(unittest.TestCase):
       # Train
       train_processor = Train()
       train_processor.trainIters(1, None)
+
+   def test_memory(self):
+
+      linear = nn.Bilinear(50, 512, 1)
+
+      # Get the shape
+      result = ((linear.in_features * linear.out_features) * (4 / (1024^3)))*2
+      print(result)
 
 
    def test_linear(self):

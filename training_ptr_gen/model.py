@@ -1,9 +1,10 @@
 from __future__ import unicode_literals, print_function, division
 import transformer_encoder
-from structured_attention import StructuralAttentionDecoder
-from structured_attention import StructuredAttentionEncoder
+from structured_attention import StructuredAttention
+from BiLSTM import BiLSTMEncoder
 from numpy import random
 from data_util import config
+from data_util.utils import calc_mem, format_mem
 
 import torch
 import torch.nn as nn
@@ -53,48 +54,69 @@ def init_wt_unif(wt):
 class Encoder(nn.Module):
     def __init__(self):
         super(Encoder, self).__init__()
+
         self.embedding = nn.Embedding(config.vocab_size, config.emb_dim)
         init_wt_normal(self.embedding.weight)
 
-        if config.use_lstm:
-            self.lstm = nn.LSTM(config.emb_dim, config.hidden_dim,
-                                num_layers=1, batch_first=True, bidirectional=True)
-            init_lstm_wt(self.lstm)
-        else:
-            model_dim = config.emb_dim
-            num_head = 2  # 8
-            num_layer = 2  # 6
-            dropout_ratio = 0.1
-            # this is output diention of tranformer encoder
-            affine_dim = config.hidden_dim * 2
+        self.lstm = nn.LSTM(config.emb_dim, config.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
+        init_lstm_wt(self.lstm)
 
-            self.lstm = transformer_encoder.Encoder(
-                num_layer, num_head, dropout_ratio, model_dim, affine_dim)
+        self.drop = nn.Dropout(0.3)
 
-        self.W_h = nn.Linear(config.hidden_dim * 2,
-                             config.hidden_dim * 2, bias=False)
+        # (512, 512)
+        self.W_h = nn.Linear(config.hidden_dim * 2,config.hidden_dim * 2, bias=False)
+
+        self.sem_dim_size = 2*config.dim_sem
+        self.token_hidden_size = 2*config.hidden_dim
+        self.anwer_hidden_size = 2*config.hidden_dim
+
+        """
+        TODO - Decide whether we have 2 encoders or whether the answer
+        are max pooled
+        """
+        self.token_level_encoder = BiLSTMEncoder(
+            torch.device("cuda" if use_cuda else "cpu"), 
+            self.token_hidden_size, 
+            config.emb_dim, 
+            1, 
+            dropout=0.3,
+            bidirectional=True
+        )
+        self.answer_level_encoder = BiLSTMEncoder(
+            torch.device("cuda" if use_cuda else "cpu"), 
+            self.anwer_hidden_size, 
+            self.token_hidden_size, 
+            1, 
+            dropout=0.3,
+            bidirectional=True
+        )
+
+        # Adding Structural Attention
+        self.structure_attention = StructuredAttention(
+            torch.device("cuda" if use_cuda else "cpu"),
+            self.sem_dim_size,
+            config.hidden_dim * 2,
+            config.bidirectional,
+            config.py_version
+        )
 
     # seq_lens should be in descending order
     def forward(self, input, seq_lens, enc_padding_mask):
+
         embedded = self.embedding(input)
 
-        if config.use_lstm:
-            packed = pack_padded_sequence(embedded, seq_lens, batch_first=True)
-            output, hidden = self.lstm(packed)
-
-            encoder_outputs, _ = pad_packed_sequence(
-                output, batch_first=True)  # h dim = B x t_k x n
-            encoder_outputs = encoder_outputs.contiguous()
-        else:
-            word_embed_proj = self.tx_proj(embedded)
-            lstm_feats = self.lstm(
-                word_embed_proj, enc_padding_mask.unsqueeze(-1))
+        # Sentence Level BiLSTM
+        encoder_outputs, hidden = self.token_level_encoder.forward_packed(embedded,seq_lens)
 
         # B * t_k x 2*hidden_dim
         encoder_feature = encoder_outputs.view(-1, 2*config.hidden_dim)
         encoder_feature = self.W_h(encoder_feature)
 
-        return encoder_outputs, encoder_feature, hidden
+        # Structural Encoder Attenion Network - returns structured infused `ri` for `i` timestep
+        # We need the Wr.ri here W
+        ri, a_jk = self.structure_attention(encoder_outputs)
+
+        return encoder_outputs, encoder_feature, hidden, ri, a_jk
 
 
 class ReduceState(nn.Module):
@@ -116,6 +138,16 @@ class ReduceState(nn.Module):
         # h, c dim = 1 x b x hidden_dim
         return (hidden_reduced_h.unsqueeze(0), hidden_reduced_c.unsqueeze(0))
 
+def calc_mem(layer):
+    size_bytes = ((linear.in_features * linear.out_features) * (4 / (1024^3)))*2
+    if size_bytes == 0:
+           return "0B"
+    size_name = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
+    i = int(math.floor(math.log(size_bytes, 1024)))
+    p = math.pow(1024, i)
+    s = round(size_bytes / p, 2)
+    print("%s %s" % (s, size_name[i]))
+    return "%s %s" % (s, size_name[i])
 
 class Attention(nn.Module):
     def __init__(self):
@@ -123,17 +155,10 @@ class Attention(nn.Module):
         # attention
         if config.is_coverage:
             self.W_c = nn.Linear(1, config.hidden_dim * 2, bias=False)
-        # TODO This is confusing.
-        # According to the Get to the point paper
-        # The attenion mechinism should be
-        # Have 2 linear layers W_h and W_s
-        # Below self.W_s looks like it is the W_s
-        # Where is the W_H?
-        # ANSWER `encoder_feature`` is Wh
-        # [512,512]
         self.W_s = nn.Linear(config.hidden_dim * 2, config.hidden_dim * 2)
         self.v = nn.Linear(config.hidden_dim * 2, 1, bias=False)
-        self.W_r = nn.Linear(50, 512, bias=False)
+        # Structural Attenion
+        self.W_r = nn.Linear(config.dim_sem * 2, config.hidden_dim * 2, bias=False)
 
     def forward(
         self,
@@ -142,36 +167,38 @@ class Attention(nn.Module):
         encoder_feature,
         enc_padding_mask,
         coverage,
-        ri,
-        Wr
+        ri
     ):
         # 8, 400, 512
         b, t_k, n = list(encoder_outputs.size())
 
-        dec_fea = self.W_s(s_t_hat)  # s_t_hat [8,512], self.W_s (512,512) -> dec_fea [8,512]
+        # s_t_hat [8,512], self.W_s (512,512) -> dec_fea [8,512]
+        dec_fea = self.W_s(s_t_hat)
         dec_fea_expanded = dec_fea.unsqueeze(1).expand(b, t_k, n).contiguous()  # [8,400,512]
-        dec_fea_expanded = dec_fea_expanded.view(-1, n) # # [3200,512]
+        dec_fea_expanded = dec_fea_expanded.view(-1, n)  # [3200,512]
 
         att_features = encoder_feature + dec_fea_expanded  # [3200,512] + [3200,512]
 
         # Coverage
         if config.is_coverage:
             coverage_input = coverage.view(-1, 1)  # B * t_k x 1
-            coverage_feature = self.W_c(
-                coverage_input)  # B * t_k x 2*hidden_dim
+            coverage_feature = self.W_c(coverage_input)  # B * t_k x 2*hidden_dim
             att_features = att_features + coverage_feature
 
         # Calculate Attention
         e = torch.tanh(att_features)  # [3200,512]
+
         scores = self.v(e)  # [3200,1]
         scores = scores.view(-1, t_k)  # [8,400]
         attn_dist_ = torch.softmax(scores, dim=1)*enc_padding_mask  # [8,400]
-        normalization_factor = attn_dist_.sum(1, keepdim=True) # [8,1]
-        attn_dist = attn_dist_ / normalization_factor #[ 8,400]
+
+        normalization_factor = attn_dist_.sum(1, keepdim=True)  # [8,1]
+        attn_dist = attn_dist_ / normalization_factor  # [ 8,400]
         attn_dist = attn_dist.unsqueeze(1)  # #[8,1,400]
 
         # Context Vector
-        c_t = torch.bmm(attn_dist, encoder_outputs)  # [8,1,400] * [8,400,512] = [8,1,400]
+        # [8,1,400] * [8,400,512] = [8,1,400]
+        c_t = torch.bmm(attn_dist, encoder_outputs)
         c_t = c_t.view(-1, config.hidden_dim * 2)  # [8,512]
 
         attn_dist = attn_dist.view(-1, t_k)  # [8,400]
@@ -185,12 +212,12 @@ class Attention(nn.Module):
         Wrri = self.W_r(ri)  # [8,400,512]
         Wrri = Wrri.contiguous().view(-1, n)  # [3200,512]
 
-        Wsst = self.W_s(s_t_hat) #[8,400,512]
+        Wsst = self.W_s(s_t_hat)  # [8,400,512]
         Wsst = Wsst.unsqueeze(1)
-        Wsst = Wsst.expand(b, t_k, n).contiguous() # [3200,50]
+        Wsst = Wsst.expand(b, t_k, n).contiguous()  # [3200,50]
         Wsst = Wsst.view(-1, n)  # [3200,50]
 
-        att_struct_features = Wrri + Wsst;
+        att_struct_features = Wrri + Wsst
 
         # Wr(ri)            [8, 400, 512]
         # self.W_s(s_t_hat) [8, 512]
@@ -199,11 +226,13 @@ class Attention(nn.Module):
         )
         e_stuct_t_i = e_stuct_t_i.view(-1, t_k)
 
-        a_t_struct = torch.softmax(e_stuct_t_i, dim=1)
+        a_t_struct = torch.softmax(e_stuct_t_i, dim=1)*enc_padding_mask
         a_t_struct = a_t_struct.unsqueeze(1)
         # Calculate the structural context vector
         c_t_stuct = torch.bmm(a_t_struct, encoder_outputs)
         c_t_stuct = c_t_stuct.view(-1, config.hidden_dim * 2)
+
+        del e_stuct_t_i, att_struct_features, Wsst, Wrri, normalization_factor
 
         return c_t, attn_dist, coverage, c_t_stuct, a_t_struct
 
@@ -216,20 +245,19 @@ class Decoder(nn.Module):
         self.embedding = nn.Embedding(config.vocab_size, config.emb_dim)
         init_wt_normal(self.embedding.weight)
 
-        self.x_context = nn.Linear(
-            config.hidden_dim * 2 + config.emb_dim, config.emb_dim)
+        self.x_context = nn.Linear(config.hidden_dim * 2 + config.emb_dim, config.emb_dim)
 
         self.lstm = nn.LSTM(
             config.emb_dim,
             config.hidden_dim,
             num_layers=1,
             batch_first=True,
-            bidirectional=False)
+            bidirectional=False
+        )
         init_lstm_wt(self.lstm)
 
         if config.pointer_gen:
-            self.p_gen_linear = nn.Linear(
-                config.hidden_dim * 4 + config.emb_dim, 1)
+            self.p_gen_linear = nn.Linear(config.hidden_dim * 4 + config.emb_dim, 1)
 
         # p_vocab
         self.out1 = nn.Linear(config.hidden_dim * 3, config.hidden_dim)
@@ -241,13 +269,12 @@ class Decoder(nn.Module):
     c_t_1 - Inital Context Vector
     s_t_1 - Inital Decoder State
     """
-
     def forward(self, y_t_1, s_t_1, encoder_outputs, encoder_feature, enc_padding_mask,
-                c_t_1, extra_zeros, enc_batch_extend_vocab, coverage, step, ri, Wr):
+                c_t_1, extra_zeros, enc_batch_extend_vocab, coverage, step, ri):
 
         if not self.training and step == 0:
             h_decoder, c_decoder = s_t_1
-            s_t_hat = torch.cat((h_decoder.view(-1, config.hidden_dim), c_decoder.view(-1, config.hidden_dim)),1)  
+            s_t_hat = torch.cat((h_decoder.view(-1, config.hidden_dim), c_decoder.view(-1, config.hidden_dim)), 1)
 
             # `c_t` - context vector
             c_t, _, coverage_next, c_struct_t, a_struct_t = self.attention_network(
@@ -255,9 +282,7 @@ class Decoder(nn.Module):
                 encoder_outputs,
                 encoder_feature,
                 enc_padding_mask,
-                coverage,
-                ri,
-                Wr
+                coverage
             )
             coverage = coverage_next
 
@@ -267,8 +292,7 @@ class Decoder(nn.Module):
         lstm_out, s_t = self.lstm(x.unsqueeze(1), s_t_1)
 
         h_decoder, c_decoder = s_t
-        s_t_hat = torch.cat((h_decoder.view(-1, config.hidden_dim),
-                             c_decoder.view(-1, config.hidden_dim)), 1)  # B x 2*hidden_dim
+        s_t_hat = torch.cat((h_decoder.view(-1, config.hidden_dim),c_decoder.view(-1, config.hidden_dim)), 1)  # B x 2*hidden_dim
 
         # Intertoken Attention
         c_t, attn_dist, coverage_next, c_struct_t, a_struct_t = self.attention_network(
@@ -277,8 +301,7 @@ class Decoder(nn.Module):
             encoder_feature,
             enc_padding_mask,
             coverage,
-            ri,
-            Wr
+            ri
         )
 
         if self.training or step > 0:
@@ -308,27 +331,22 @@ class Decoder(nn.Module):
             final_dist = vocab_dist_.scatter_add(1, enc_batch_extend_vocab, attn_dist_)
         else:
             final_dist = vocab_dist
+        
+        del vocab_dist, vocab_dist_, attn_dist_, output, s_t_hat, h_decoder, c_decoder, lstm_out
 
         return final_dist, s_t, c_t, attn_dist, p_gen, coverage
 
 
-class Model(object):
+class Model(nn.Module):
     def __init__(self, model_file_path=None, is_eval=False):
+        super(Model, self).__init__()
+
         encoder = Encoder()
         decoder = Decoder()
         reduce_state = ReduceState()
 
-        # Adding Structural Attention
-        self.structure_attention_encoder = StructuredAttentionEncoder(
-            torch.device("cuda" if use_cuda else "cpu"),
-            config.dim_sem,
-            config.hidden_dim * 2,
-            config.bidirectional,
-            config.py_version
-        )
-
         # shared the embedding between encoder and decoder
-        decoder.embedding.weight = encoder.embedding.weight
+        #decoder.embedding.weight = encoder.embedding.weight
         if is_eval:
             encoder = encoder.eval()
             decoder = decoder.eval()

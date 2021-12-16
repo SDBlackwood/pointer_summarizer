@@ -1,4 +1,6 @@
 from __future__ import unicode_literals, print_function, division
+import GPUtil
+GPUtil.showUtilization()
 
 import sys
 sys.path.append("/home/postscript/Workspace/DS/Workspace/Project/Code/stacksumm2/training_ptr_gen")
@@ -22,10 +24,12 @@ from data_util.utils import calc_running_avg_loss
 from train_util import get_input_from_batch, get_output_from_batch
 
 # Structured Attentions
-from structured_attention import StructuredAttentionEncoder
-from structured_attention import StructuralAttentionDecoder
+from structured_attention import StructuredAttention
 
 use_cuda = config.use_gpu and torch.cuda.is_available()
+
+
+
 
 class Train(object):
     def __init__(self):
@@ -59,8 +63,7 @@ class Train(object):
     def setup_train(self, model_file_path=None):
         self.model = Model(model_file_path)
 
-        params = list(self.model.encoder.parameters()) + list(self.model.decoder.parameters()) + \
-                 list(self.model.reduce_state.parameters())
+        params = list(self.model.encoder.parameters()) + list(self.model.decoder.parameters()) + list(self.model.reduce_state.parameters())
         initial_lr = config.lr_coverage if config.is_coverage else config.lr
         self.optimizer = Adagrad(params, lr=initial_lr, initial_accumulator_value=config.adagrad_init_acc)
 
@@ -81,6 +84,9 @@ class Train(object):
 
         return start_iter, start_loss
 
+    def monitor_memory(self):
+        GPUtil.showUtilization()
+
     def train_one_batch(self, batch):
         enc_batch, enc_padding_mask, enc_lens, enc_batch_extend_vocab, extra_zeros, c_t_1, coverage = \
             get_input_from_batch(batch, use_cuda)
@@ -90,11 +96,7 @@ class Train(object):
         self.optimizer.zero_grad()
 
         # Encoder Section
-        encoder_outputs, encoder_feature, encoder_hidden = self.model.encoder(enc_batch, enc_lens, enc_padding_mask)
-        
-        # Structural Encoder Attenion Network - returns structured infused `ri` for `i` timestep
-        # We need the Wr.ri here W
-        ri, attention_matrix, Wr = self.model.structure_attention_encoder( encoder_outputs )
+        encoder_outputs, encoder_feature, encoder_hidden, ri, attention_matrix = self.model.encoder(enc_batch, enc_lens, enc_padding_mask)
 
         # Reduce State - inital decoder state ([1, 8, 256]),([1, 8, 256])
         # Encoder is BiLSTM so there are 2 rows
@@ -117,8 +119,7 @@ class Train(object):
                 enc_batch_extend_vocab, 
                 coverage, 
                 di, # decoder step
-                ri,
-                Wr
+                ri
             )
 
             target = target_batch[:, di]
