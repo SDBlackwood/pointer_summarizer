@@ -153,15 +153,15 @@ class Train(object):
             running_avg_loss = calc_running_avg_loss(loss, running_avg_loss, self.summary_writer, iter)
             iter += 1
 
-            if iter % self.config.log_period == 0:
+            if iter % config.log_period == 0:
                 elapsed = time.time() - start
-                estimated_time = ((self.config.max_iterations / iter) * elapsed) /60 / 60
+                estimated_time = ((config.max_iterations / iter) * elapsed) /60 / 60
                 text = 'steps %d, seconds for %d batch: %.2f, loss: %f.  Estimated training time: %d hrs' % (iter, iter, time.time() - start, loss, estimated_time)  
                 print(text)
                 self.summary_writer.flush()
 
             # Stop if the loss is less than the early stopping value
-            if loss < self.config.early_stopping:
+            if loss < config.early_stopping:
                 break
     
             if iter % 5000 == 0:
