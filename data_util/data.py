@@ -5,10 +5,16 @@ import random
 import struct
 import csv
 from tensorflow.core.example import example_pb2
+import torchtext.data as data
+import torchtext.vocab as vocab
 
 # <s> and </s> are used in the data files to segment the abstracts into sentences. They don't receive vocab ids.
 SENTENCE_START = b'<s>'
 SENTENCE_END = b'</s>'
+
+# <a> and </a> are used in the data files to segment the abstracts into sentences. They don't receive vocab ids.
+ANSWER_START = b'<a>'
+ANSWER_END = b'</a>'
 
 PAD_TOKEN = b'[PAD]' # This has a vocab id, which is used to pad the encoder input, decoder input and target sequence
 UNKNOWN_TOKEN = b'[UNK]' # This has a vocab id, which is used to represent out-of-vocabulary words
@@ -51,6 +57,8 @@ class Vocab(object):
           break
 
     print (f"Finished constructing vocabulary of {self._count} total words. Last word added: {self._id_to_word[self._count-1]}")
+
+    #self.vec = vocab.GloVe(name='6B', dim=50)
 
   def word2id(self, word):
     if word.decode() not in self._word_to_id:

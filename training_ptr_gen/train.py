@@ -2,7 +2,6 @@ from __future__ import unicode_literals, print_function, division
 
 import sys
 sys.path.append("/home/postscript/Workspace/DS/Workspace/Project/Code/stacksumm2/training_ptr_gen")
-print(sys.path)
 
 import os
 import time
@@ -83,7 +82,7 @@ class Train(object):
         return start_iter, start_loss
 
     def train_one_batch(self, batch):
-        enc_batch, enc_padding_mask, enc_lens, enc_batch_extend_vocab, extra_zeros, c_t_1, coverage = \
+        enc_batch, enc_padding_mask, enc_lens, enc_batch_extend_vocab, extra_zeros, c_t_1, coverage , answer_index, answer_votescore, answer_reputation = \
             get_input_from_batch(batch, use_cuda)
         dec_batch, dec_padding_mask, max_dec_len, dec_lens_var, target_batch = \
             get_output_from_batch(batch, use_cuda)
@@ -91,10 +90,7 @@ class Train(object):
         for param in self.model.parameters():
             param.grad = None
 
-        loss = self.model(enc_batch, enc_padding_mask, enc_lens, enc_batch_extend_vocab, extra_zeros, c_t_1, coverage, dec_batch, dec_padding_mask, max_dec_len, dec_lens_var, target_batch )
-        # self.summary_writer.add_graph(
-        #     self.model, input_to_model=(enc_batch, enc_padding_mask, torch.from_numpy(enc_lens), enc_batch_extend_vocab, extra_zeros, c_t_1, coverage, dec_batch, dec_padding_mask, torch.tensor([max_dec_len]), dec_lens_var, target_batch), verbose=False
-        # )
+        loss = self.model(enc_batch, enc_padding_mask, enc_lens, enc_batch_extend_vocab, extra_zeros, c_t_1, coverage, dec_batch, dec_padding_mask, max_dec_len, dec_lens_var, target_batch , answer_index, answer_votescore, answer_reputation)
         loss.backward()
 
         self.norm = clip_grad_norm_(self.model.encoder.parameters(), config.max_grad_norm)

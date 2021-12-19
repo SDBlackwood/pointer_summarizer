@@ -1,6 +1,10 @@
 from __future__ import unicode_literals, print_function, division
-import transformer_encoder
+import sys
+sys.path.append("/home/postscript/Workspace/DS/Workspace/Project/Code/stacksumm2/data_util")
+sys.path.append(".")
+
 from structured_attention import StructuredAttention
+from explict_structured_attention import ExplictStructuredAttention
 from BiLSTM import BiLSTMEncoder
 from numpy import random
 from data_util import config
@@ -10,8 +14,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
-import sys
-sys.path.append(".")
 
 use_cuda = config.use_gpu and torch.cuda.is_available()
 
@@ -58,8 +60,8 @@ class Encoder(nn.Module):
         self.embedding = nn.Embedding(config.vocab_size, config.emb_dim)
         init_wt_normal(self.embedding.weight)
 
-        self.lstm = nn.LSTM(config.emb_dim, config.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
-        init_lstm_wt(self.lstm)
+        #self.lstm = nn.LSTM(config.emb_dim, config.hidden_dim, num_layers=1, batch_first=True, bidirectional=True)
+        #init_lstm_wt(self.lstm)
 
         self.drop = nn.Dropout(0.3)
 
@@ -68,24 +70,13 @@ class Encoder(nn.Module):
 
         self.sem_dim_size = 2*config.dim_sem
         self.token_hidden_size = 2*config.hidden_dim
-        self.anwer_hidden_size = 2*config.hidden_dim
 
         """
-        TODO - Decide whether we have 2 encoders or whether the answer
-        are max pooled
         """
         self.token_level_encoder = BiLSTMEncoder(
             torch.device("cuda" if use_cuda else "cpu"), 
             self.token_hidden_size, 
             config.emb_dim, 
-            1, 
-            dropout=0.3,
-            bidirectional=True
-        )
-        self.answer_level_encoder = BiLSTMEncoder(
-            torch.device("cuda" if use_cuda else "cpu"), 
-            self.anwer_hidden_size, 
-            self.token_hidden_size, 
             1, 
             dropout=0.3,
             bidirectional=True
@@ -101,25 +92,38 @@ class Encoder(nn.Module):
                 config.py_version
             )
 
-    # seq_lens should be in descending order
-    def forward(self, input, seq_lens, enc_padding_mask):
+        # Adding Latent Structural Attention
+        if config.is_esa:
+            self.explict_structure_attention = ExplictStructuredAttention(
+                config.hidden_dim
+            )
 
+    # seq_lens should be in descending order
+    def forward(self, input, seq_lens, enc_padding_mask, answer_index, answer_votescore, answer_reputation):
+
+        # input is (batch, encoder size) e.g 8,200
         embedded = self.embedding(input)
 
         # Sentence Level BiLSTM
         encoder_outputs, hidden = self.token_level_encoder.forward_packed(embedded,seq_lens)
+        mask = enc_padding_mask.unsqueeze(2).expand(config.batch_size, config.max_enc_steps, config.hidden_dim*2)
+        encoder_outputs = encoder_outputs * mask
 
         # B * t_k x 2*hidden_dim
         encoder_feature = encoder_outputs.view(-1, 2*config.hidden_dim)
         encoder_feature = self.W_h(encoder_feature)
 
-        # Structural Encoder Attenion Network - returns structured infused `ri` for `i` timestep
-        # We need the Wr.ri here W
-        ri, a_jk = None, None
+        # Structural Encoder Attenion Network - returns structured infused `r_i` for `i` timestep
+        # We need the Wr.r_i here W
+        r_i, a_jk = None, None
         if config.is_lsa:
-            ri, a_jk = self.structure_attention(encoder_outputs)
-        
-        return encoder_outputs, encoder_feature, hidden, ri, a_jk
+            r_i, a_jk = self.structure_attention(encoder_outputs)
+
+        e_i = None
+        if config.is_esa:
+            e_i = self.explict_structure_attention(encoder_outputs, answer_votescore + answer_reputation)
+
+        return encoder_outputs, encoder_feature, hidden, r_i, a_jk, e_i
 
 
 class ReduceState(nn.Module):
@@ -142,7 +146,7 @@ class ReduceState(nn.Module):
         return (hidden_reduced_h.unsqueeze(0), hidden_reduced_c.unsqueeze(0))
 
 class Attention(nn.Module):
-    def __init__(self):
+    def __init__(self, attention_dimension):
         super(Attention, self).__init__()
         # attention
         if config.is_coverage:
@@ -151,7 +155,7 @@ class Attention(nn.Module):
         self.v = nn.Linear(config.hidden_dim * 2, 1, bias=False)
         # Structural Attenion
         if config.is_lsa:
-            self.W_r = nn.Linear(config.dim_sem * 2, config.hidden_dim * 2, bias=False)
+            self.W_r = nn.Linear(attention_dimension + 256, config.hidden_dim * 2, bias=False)
 
     def forward(
         self,
@@ -160,7 +164,7 @@ class Attention(nn.Module):
         encoder_feature,
         enc_padding_mask,
         coverage,
-        ri
+        r_i
     ):
         # 8, 400, 512
         b, t_k, n = list(encoder_outputs.size())
@@ -201,10 +205,10 @@ class Attention(nn.Module):
             coverage = coverage + attn_dist
 
         # Structural attention
-        # ri [8,400,50] Wr [50,512]
+        # r_i [8,400,50] Wr [50,512]
         a_t_struct, c_t_stuct = None, None
         if config.is_lsa:
-            Wrri = self.W_r(ri)  # [8,400,512]
+            Wrri = self.W_r(r_i)  # [8,400,512]
             Wrri = Wrri.contiguous().view(-1, n)  # [3200,512]
 
             Wsst = self.W_s(s_t_hat)  # [8,400,512]
@@ -214,7 +218,7 @@ class Attention(nn.Module):
 
             att_struct_features = Wrri + Wsst
 
-            # Wr(ri)            [8, 400, 512]
+            # Wr(r_i)            [8, 400, 512]
             # self.W_s(s_t_hat) [8, 512]
             e_stuct_t_i = self.v(
                 torch.tanh(att_struct_features)
@@ -233,7 +237,11 @@ class Attention(nn.Module):
 class Decoder(nn.Module):
     def __init__(self):
         super(Decoder, self).__init__()
-        self.attention_network = Attention()
+        attention_dimension = config.dim_sem * 2 
+        if config.is_esa:
+            attention_dimension + config.hidden_dim
+
+        self.attention_network = Attention(attention_dimension)
         # decoder
         self.embedding = nn.Embedding(config.vocab_size, config.emb_dim)
         init_wt_normal(self.embedding.weight)
@@ -263,7 +271,7 @@ class Decoder(nn.Module):
     s_t_1 - Inital Decoder State
     """
     def forward(self, y_t_1, s_t_1, encoder_outputs, encoder_feature, enc_padding_mask,
-                c_t_1, extra_zeros, enc_batch_extend_vocab, coverage, step, ri):
+                c_t_1, extra_zeros, enc_batch_extend_vocab, coverage, step, r_i):
 
         if not self.training and step == 0:
             h_decoder, c_decoder = s_t_1
@@ -276,7 +284,7 @@ class Decoder(nn.Module):
                 encoder_feature,
                 enc_padding_mask,
                 coverage,
-                ri
+                r_i
             )
             coverage = coverage_next
 
@@ -295,7 +303,7 @@ class Decoder(nn.Module):
             encoder_feature,
             enc_padding_mask,
             coverage,
-            ri
+            r_i
         )
 
         if self.training or step > 0:
@@ -364,9 +372,10 @@ class Model(nn.Module):
                 state['decoder_state_dict'], strict=False)
             self.reduce_state.load_state_dict(state['reduce_state_dict'])
     
-    def forward(self, enc_batch, enc_padding_mask, enc_lens, enc_batch_extend_vocab, extra_zeros, c_t_1, coverage, dec_batch, dec_padding_mask, max_dec_len, dec_lens_var, target_batch ):
+    def forward(self, enc_batch, enc_padding_mask, enc_lens, enc_batch_extend_vocab, extra_zeros, c_t_1, coverage, dec_batch, dec_padding_mask, max_dec_len, dec_lens_var, target_batch, answer_index, answer_votescore, answer_reputation ):
+        
         # Encoder Section
-        encoder_outputs, encoder_feature, encoder_hidden, ri, attention_matrix = self.encoder(enc_batch, enc_lens, enc_padding_mask)
+        encoder_outputs, encoder_feature, encoder_hidden, r_i, attention_matrix, e_i = self.encoder(enc_batch, enc_lens, enc_padding_mask, answer_index, answer_votescore, answer_reputation)
 
         # Reduce State - inital decoder state ([1, 8, 256]),([1, 8, 256])
         # Encoder is BiLSTM so there are 2 rows
@@ -389,7 +398,7 @@ class Model(nn.Module):
                 enc_batch_extend_vocab, 
                 coverage, 
                 di, # decoder step
-                ri
+                torch.cat((r_i,e_i), 2)
             )
 
             target = target_batch[:, di]

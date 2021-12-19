@@ -7,13 +7,14 @@ from threading import Thread
 
 import numpy as np
 import tensorflow as tf
+import torch
 
 import data_util.config as config
 import data_util.data as data
 
 import random
 random.seed(1234)
-
+import re
 
 class Example(object):
 
@@ -22,12 +23,48 @@ class Example(object):
     start_decoding = vocab.word2id(data.START_DECODING)
     stop_decoding = vocab.word2id(data.STOP_DECODING)
 
-    # Process the article
+
+    """Process the article
+    """
+    # Get the votescore and reputation
+    answers = re.findall(b'<a>(.+?)</a>', article)
+    answer_words = []
+    answer_count = 0
+    answer_index = []
+    answer_votescore  = []
+    answer_reputation  = []
+    for i, answer in enumerate(answers):
+      vote_score = re.findall(b'<v>(.+?)</v>', answer)[0].decode()
+      reputation = re.findall(b'<r>(.+?)</r>', answer)[0].decode()
+
+      for item in answer.split():
+          answer_index.append(answer_count)
+          answer_votescore.append(int(vote_score))
+          answer_reputation.append(int(reputation))
+      answer_count += 1
+          
+      answer_words.extend(answer.split())
+      
     article_words = article.split()
     if len(article_words) > config.max_enc_steps:
       article_words = article_words[:config.max_enc_steps]
+      answer_index = answer_index[:config.max_enc_steps]
+      answer_votescore = answer_votescore[:config.max_enc_steps]
+      answer_reputation = answer_reputation[:config.max_enc_steps]
+
+    if len(article_words) < config.max_enc_steps:
+      for i in range(len(article_words), config.max_enc_steps):
+        article_words[i] = -1
+        answer_index[i] = -1
+        answer_votescore[i] = -1
+        answer_reputation[i] = -1
+      
     self.enc_len = len(article_words) # store the length after truncation but before padding
     self.enc_input = [vocab.word2id(w) for w in article_words] # list of word ids; OOVs are represented by the id for UNK token
+
+    self.answer_index = answer_index
+    self.answer_votescore = answer_votescore
+    self.answer_reputation = answer_reputation
 
     # Process the abstract
     abstract = b' '.join(abstract_sentences) # string
@@ -80,6 +117,17 @@ class Example(object):
       while len(self.enc_input_extend_vocab) < max_len:
         self.enc_input_extend_vocab.append(pad_id)
 
+  def pad_encoder_index_input(self, max_len, pad_id):
+    while len(self.answer_index) < max_len:
+      self.answer_index.append(-1)
+      self.answer_votescore.append(-1)
+      self.answer_reputation.append(-1)
+    if config.pointer_gen:
+      while len(self.enc_input_extend_vocab) < max_len:
+        self.answer_index.append(-1)
+        self.answer_votescore.append(-1)
+        self.answer_reputation.append(-1)
+
 
 class Batch(object):
   def __init__(self, example_list, vocab, batch_size):
@@ -97,12 +145,17 @@ class Batch(object):
     # Pad the encoder input sequences up to the length of the longest sequence
     for ex in example_list:
       ex.pad_encoder_input(max_enc_seq_len, self.pad_id)
-
+      ex.pad_encoder_index_input(max_enc_seq_len, self.pad_id)
+    
     # Initialize the numpy arrays
     # Note: our enc_batch can have different length (second dimension) for each batch because we use dynamic_rnn for the encoder.
     self.enc_batch = np.zeros((self.batch_size, max_enc_seq_len), dtype=np.int32)
     self.enc_lens = np.zeros((self.batch_size), dtype=np.int32)
     self.enc_padding_mask = np.zeros((self.batch_size, max_enc_seq_len), dtype=np.float32)
+
+    self.answer_index = torch.tensor([x.answer_index for x in example_list], dtype=torch.int32)
+    self.answer_votescore = torch.tensor([x.answer_votescore for x in example_list], dtype=torch.int32)
+    self.answer_reputation = torch.tensor([x.answer_reputation for x in example_list], dtype=torch.int32)
 
     # Fill in the numpy arrays
     for i, ex in enumerate(example_list):
@@ -145,7 +198,6 @@ class Batch(object):
     self.original_articles = [ex.original_article for ex in example_list] # list of lists
     self.original_abstracts = [ex.original_abstract for ex in example_list] # list of lists
     self.original_abstracts_sents = [ex.original_abstract_sents for ex in example_list] # list of list of lists
-
 
 class Batcher(object):
   BATCH_QUEUE_MAX = 100 # max number of batches the batch_queue can hold
@@ -248,7 +300,6 @@ class Batcher(object):
       #   'Bucket queue size: %i, Input queue size: %i',
       #   self._batch_queue.qsize(), self._example_queue.qsize())
 
-      time.sleep(2)
       for idx,t in enumerate(self._example_q_threads):
         if not t.is_alive(): # if the thread is dead
           #tf.compat.v1.logging.error('Found example queue thread dead. Restarting.')

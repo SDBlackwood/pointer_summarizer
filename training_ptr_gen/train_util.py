@@ -6,6 +6,10 @@ from data_util import config
 def get_input_from_batch(batch, use_cuda):
   batch_size = len(batch.enc_lens)
 
+  answer_index = batch.answer_index
+  answer_votescore = batch.answer_votescore
+  answer_reputation = batch.answer_reputation
+
   enc_batch = Variable(torch.from_numpy(batch.enc_batch).long())
   enc_padding_mask = Variable(torch.from_numpy(batch.enc_padding_mask)).float()
   enc_lens = batch.enc_lens
@@ -19,7 +23,7 @@ def get_input_from_batch(batch, use_cuda):
       extra_zeros = Variable(torch.zeros((batch_size, batch.max_art_oovs)))
 
   # Inital Context Vector [8,512]
-  c_t_1 = Variable(torch.zeros((batch_size, 2 * config.hidden_dim)))
+  c_t_1 = torch.zeros((batch_size, 2 * config.hidden_dim))
 
   coverage = None
   if config.is_coverage:
@@ -37,7 +41,7 @@ def get_input_from_batch(batch, use_cuda):
 
     if coverage is not None:
       coverage = coverage.cuda()
-  return enc_batch, enc_padding_mask, enc_lens, enc_batch_extend_vocab, extra_zeros, c_t_1, coverage
+  return enc_batch, enc_padding_mask, enc_lens, enc_batch_extend_vocab, extra_zeros, c_t_1, coverage, answer_index, answer_votescore, answer_reputation
 
 def get_output_from_batch(batch, use_cuda):
   dec_batch = Variable(torch.from_numpy(batch.dec_batch).long())

@@ -23,7 +23,6 @@ class Evaluate(object):
         self.vocab = Vocab(config.vocab_path, config.vocab_size)
         self.batcher = Batcher(config.eval_data_path, self.vocab, mode='eval',
                                batch_size=config.batch_size, single_pass=True)
-        time.sleep(1)
         model_name = os.path.basename(model_file_path)
 
         eval_dir = os.path.join(config.log_root, 'eval_%s' % (model_name))

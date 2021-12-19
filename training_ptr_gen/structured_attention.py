@@ -16,7 +16,7 @@ import torch.nn as nn
 import torch
 import torch.nn.functional as F
 import math 
-from data_util.utils import calc_mem, format_mem
+#from data_util.utils import calc_mem, format_mem
 
 class StructuredAttention(nn.Module):
     def __init__(self, device, sem_dim_size, sent_hiddent_size, bidirectional, py_version):
@@ -35,31 +35,31 @@ class StructuredAttention(nn.Module):
         self.W_p = nn.Linear(self.str_dim_size, self.str_dim_size, bias=True)
         torch.nn.init.xavier_uniform_(self.W_p.weight)
         nn.init.constant_(self.W_p.bias, 0)
-        mem.append(calc_mem(self.W_p))
+        #mem.append(calc_mem(self.W_p))
 
         # (412, 412)
         self.W_c = nn.Linear(self.str_dim_size, self.str_dim_size, bias=True)
         torch.nn.init.xavier_uniform_(self.W_c.weight)
         nn.init.constant_(self.W_c.bias, 0)
-        mem.append(calc_mem(self.W_c))
+        #mem.append(calc_mem(self.W_c))
 
         # (412, 412)
         self.fi_linear = nn.Linear(self.str_dim_size, 1, bias=False)
         torch.nn.init.xavier_uniform_(self.fi_linear.weight)
-        mem.append(calc_mem(self.fi_linear))
+        #mem.append(calc_mem(self.fi_linear))
 
         self.W_a = nn.Bilinear(self.str_dim_size, self.str_dim_size, 1, bias=False)
         torch.nn.init.xavier_uniform_(self.W_a.weight)
-        mem.append(calc_mem(self.W_a))
+        #mem.append(calc_mem(self.W_a))
 
         self.exparam = nn.Parameter(torch.Tensor(1,1,self.sem_dim_size))
         torch.nn.init.xavier_uniform_(self.exparam)
         self.W_r = nn.Linear(3*self.sem_dim_size, self.sem_dim_size, bias=True)
         torch.nn.init.xavier_uniform_(self.W_r.weight)
         nn.init.constant_(self.W_r.bias, 0)
-        mem.append(calc_mem(self.W_r))
+        #mem.append(calc_mem(self.W_r))
 
-        format_mem(sum(mem))
+        #format_mem(sum(mem))
 
 
     def forward(self, input): 

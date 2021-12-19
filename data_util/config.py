@@ -16,14 +16,14 @@ log_root = os.path.join(root_dir, os.getenv('log_root'))
 # Hyperparameters
 hidden_dim = 128
 emb_dim= 64
-batch_size= 4
-max_enc_steps=400
+batch_size= 8
+max_enc_steps=200
 max_dec_steps=100
 beam_size=4
 min_dec_steps=35
 vocab_size=50000
 
-lr=0.2
+lr=0.15
 adagrad_init_acc=0.1
 rand_unif_init_mag=0.02
 trunc_norm_init_std=1e-4
@@ -32,12 +32,12 @@ max_grad_norm=2.0
 pointer_gen = True
 is_coverage = True
 is_lsa = True
-is_esa = False
+is_esa = True
 cov_loss_wt = 1.0
 
 eps = 1e-12
 max_iterations = 20000
-early_stopping = 2.5
+early_stopping = 0
 
 use_gpu=True
 
