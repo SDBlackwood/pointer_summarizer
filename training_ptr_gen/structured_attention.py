@@ -7,7 +7,6 @@ Example
 self.sentence_structure_att = StructuredAttention(device, self.sem_dim_size, self.sent_hidden_size, bidirectional, py_version)
 self.document_structure_att = StructuredAttention(device, self.sem_dim_size, self.doc_hidden_size, bidirectional, py_version)
 
-
 Returns:
     [type]: [description]
 """

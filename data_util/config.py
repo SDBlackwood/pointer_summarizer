@@ -36,7 +36,7 @@ is_esa = True
 cov_loss_wt = 1.0
 
 eps = 1e-12
-max_iterations = 20000
+max_iterations = 10000
 early_stopping = 0
 
 use_gpu=True
@@ -50,7 +50,7 @@ py_version="1.9"
 data_file='data/yelp-2013/yelp-2013-all.pkl'
 reload_path='./saved_models/best_model.pth'
 dim_str=50 # size of word embeddings
-dim_sem=50 #size of word embeddings
+dim_sem=30 #size of word embeddings
 nlayers=1 #number of layers')
 dropout=0.2 # dropout applied to layers (0 = no dropout)
 clip=5 # gradient clip
