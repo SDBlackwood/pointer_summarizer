@@ -155,7 +155,7 @@ class Attention(nn.Module):
         self.v = nn.Linear(config.hidden_dim * 2, 1, bias=False)
         # Structural Attenion
         if config.is_lsa:
-            self.W_r = nn.Linear(attention_dimension + config.hidden_dim*2, config.hidden_dim * 2, bias=False)
+            self.W_r = nn.Linear(attention_dimension, config.hidden_dim * 2, bias=False)
 
     def forward(
         self,
@@ -386,6 +386,9 @@ class Model(nn.Module):
         for di in range(min(max_dec_len, config.max_dec_steps)):
             y_t_1 = dec_batch[:, di]  # Teacher forcing
 
+            if config.is_esa:
+                r_i = torch.cat((r_i,e_i), 2)
+
             # Decoder step
             final_dist, s_t_1,  c_t_1, attn_dist, p_gen, next_coverage = self.decoder(
                 y_t_1, 
@@ -398,7 +401,7 @@ class Model(nn.Module):
                 enc_batch_extend_vocab, 
                 coverage, 
                 di, # decoder step
-                torch.cat((r_i,e_i), 2)
+                r_i
             )
 
             target = target_batch[:, di]
