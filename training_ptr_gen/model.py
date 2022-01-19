@@ -155,7 +155,7 @@ class Attention(nn.Module):
         self.v = nn.Linear(config.hidden_dim * 2, 1, bias=False)
         # Structural Attenion
         if config.is_lsa:
-            self.W_r = nn.Linear(attention_dimension + config.hidden_dim, config.hidden_dim * 2, bias=False)
+            self.W_r = nn.Linear(attention_dimension + config.hidden_dim*2, config.hidden_dim * 2, bias=False)
 
     def forward(
         self,
