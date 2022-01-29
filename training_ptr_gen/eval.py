@@ -76,6 +76,7 @@ class Evaluate(object):
             iter += 1
 
             print_interval = 10
+            start = time.time()
             text = 'steps %d, seconds for %d batch: %.2f , loss: %f' % (iter, print_interval, time.time() - start, running_avg_loss)
             print(text)
             self.summary_writer.flush()
