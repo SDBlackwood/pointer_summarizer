@@ -14,7 +14,7 @@ vocab_path = os.path.join(root_dir, os.getenv('vocab_path'))
 log_root = os.path.join(root_dir, os.getenv('log_root'))
 
 # Hyperparameters
-hidden_dim = 128
+hidden_dim = 256
 emb_dim= 64
 batch_size= 8
 max_enc_steps=200

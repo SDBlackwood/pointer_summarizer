@@ -196,7 +196,7 @@ class StructuredAttention(nn.Module):
         si = torch.bmm(a_ki, ssr)
         # Conxtext Vector gathered from possible children
         ci = torch.bmm(a_ik, e_i)
-        ri = torch.tanh(
+        r_i = torch.tanh(
             self.W_r(
                     torch.cat(
                         [e_i, si, ci],
@@ -206,4 +206,4 @@ class StructuredAttention(nn.Module):
         )
         del e_i, a_ik, ssr, si, ci
 
-        return ri, a_ki
+        return r_i, a_ki
