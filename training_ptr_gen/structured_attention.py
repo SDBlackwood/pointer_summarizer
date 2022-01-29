@@ -124,7 +124,17 @@ class StructuredAttention(nn.Module):
         del d_i
 
         # [8,400,400]
-        mask = f_jk.new_ones(f_jk.size(1), f_jk.size(1)) - torch.eye(f_jk.size(1), f_jk.size(1))
+        a = f_jk.new_ones(
+          f_jk.size(1), 
+          f_jk.size(1)
+        )
+        b = torch.eye(
+          f_jk.size(1),
+          f_jk.size(1)
+        )
+        b = b.to(self.device)
+
+        mask = a - b
         mask = mask.unsqueeze(0).expand(f_jk.size(0), mask.size(0), mask.size(1)).to(self.device)
         
         """
