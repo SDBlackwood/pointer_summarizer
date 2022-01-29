@@ -83,15 +83,16 @@ class Encoder(nn.Module):
         )
 
         # Adding Structural Attention
-        self.structure_attention = StructuredAttention(
-            torch.device("cuda" if use_cuda else "cpu"),
-            self.sem_dim_size,
-            config.hidden_dim * 2,
-            config.bidirectional,
-            config.py_version
-        )
+        if config.is_lsa:
+            self.structure_attention = StructuredAttention(
+                torch.device("cuda" if use_cuda else "cpu"),
+                self.sem_dim_size,
+                config.hidden_dim * 2,
+                config.bidirectional,
+                config.py_version
+            )
 
-        # Adding Latent Structural Attention
+        # Adding Explict Structural Attention
         if config.is_esa:
             self.explict_structure_attention = ExplictStructuredAttention(
                 config.hidden_dim
