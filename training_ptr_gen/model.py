@@ -99,7 +99,8 @@ class Encoder(nn.Module):
         # Adding Explict Structural Attention
         if config.is_esa:
             self.explict_structure_attention = ExplictStructuredAttention(
-                config.hidden_dim
+                config.hidden_dim,
+                config,
             )
             if use_cuda:
                 self.explict_structure_attention = self.explict_structure_attention.cuda()

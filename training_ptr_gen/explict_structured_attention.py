@@ -19,10 +19,12 @@ import math
 #from data_util.utils import calc_mem, format_mem
 
 class ExplictStructuredAttention(nn.Module):
-    def __init__(self, hidden_dimension):
+    def __init__(self, hidden_dimension, config):
         super(ExplictStructuredAttention, self).__init__()
         
         self.hidden_dimension = hidden_dimension;
+
+        self.use_cuda  = config.use_gpu and torch.cuda.is_available()
 
         # (256, 256)
         self.F_u = nn.Linear(self.hidden_dimension * 2, self.hidden_dimension* 2, bias=True)
@@ -35,6 +37,10 @@ class ExplictStructuredAttention(nn.Module):
         nn.init.constant_(self.F_e.bias, 0)
 
     def forward(self, input, structure): 
+
+        if self.use_cuda:
+            structure.to("cuda")
+            input.to("cuda")
 
         structure = torch.unsqueeze(structure, 2).expand(input.size())
 
