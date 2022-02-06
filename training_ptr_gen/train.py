@@ -59,15 +59,6 @@ class Train(object):
 
         params = list(self.model.encoder.parameters()) + list(self.model.decoder.parameters()) + list(self.model.reduce_state.parameters())
 
-        if torch.cuda.device_count()>1:
-        # Multi-GPU Training
-            self.model.encoder = nn.DataParallel(self.model.encoder)
-            self.model.decoder = nn.DataParallel(self.model.decoder)
-            self.model.reduce_state = nn.DataParallel(self.model.reduce_state)
-
-        for i, p in enumerate(params):
-            print(i, p.device)
-
         initial_lr = config.lr_coverage if config.is_coverage else config.lr
         self.optimizer = Adagrad(params, lr=initial_lr, initial_accumulator_value=config.adagrad_init_acc)
 
@@ -169,10 +160,6 @@ class Train(object):
                 text = 'steps %d, seconds for %d batch: %.2f, loss: %f.  Estimated training time: %d hrs' % (iter, iter, time.time() - start, loss, estimated_time)  
                 print(text)
                 self.summary_writer.flush()
-
-            # Stop if the loss is less than the early stopping value
-            if loss < int(config.early_stopping):
-                break
     
             if iter % 5000 == 0:
                 self.save_model(running_avg_loss, iter)
