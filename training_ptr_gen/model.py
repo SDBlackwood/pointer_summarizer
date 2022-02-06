@@ -81,6 +81,8 @@ class Encoder(nn.Module):
             dropout=0.3,
             bidirectional=True
         )
+        if use_cuda:
+            self.token_level_encoder = self.token_level_encoder.cuda()
 
         # Adding Structural Attention
         if config.is_lsa:
@@ -91,12 +93,17 @@ class Encoder(nn.Module):
                 config.bidirectional,
                 config.py_version
             )
+            if use_cuda:
+                self.structure_attention = self.structure_attention.cuda()
 
         # Adding Explict Structural Attention
         if config.is_esa:
             self.explict_structure_attention = ExplictStructuredAttention(
                 config.hidden_dim
             )
+            if use_cuda:
+                self.explict_structure_attention = self.explict_structure_attention.cuda()
+
 
     # seq_lens should be in descending order
     def forward(self, input, seq_lens, enc_padding_mask, answer_index, answer_votescore, answer_reputation):
@@ -254,6 +261,7 @@ class Decoder(nn.Module):
             attention_dimension + config.hidden_dim
 
         self.attention_network = Attention(attention_dimension)
+
         # decoder
         self.embedding = nn.Embedding(config.vocab_size, config.emb_dim)
         init_wt_normal(self.embedding.weight)
@@ -268,6 +276,10 @@ class Decoder(nn.Module):
             bidirectional=False
         )
         init_lstm_wt(self.lstm)
+
+        if use_cuda:
+            self.attention_network = self.attention_network.cuda()
+            self.embedding = self.embedding.cuda()
 
         if config.pointer_gen:
             self.p_gen_linear = nn.Linear(config.hidden_dim * 4 + config.emb_dim, 1)
