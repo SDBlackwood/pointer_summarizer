@@ -59,6 +59,12 @@ class Train(object):
 
         params = list(self.model.encoder.parameters()) + list(self.model.decoder.parameters()) + list(self.model.reduce_state.parameters())
 
+        if torch.cuda.device_count()>1:
+        # Multi-GPU Training
+            self.model.encoder = nn.DataParallel(self.model.encoder)
+            self.model.decoder = nn.DataParallel(self.model.decoder)
+            self.model.reduce_state = nn.DataParallel(self.model.reduce_state)
+
         for i, p in enumerate(params):
             print(i, p.device)
 
