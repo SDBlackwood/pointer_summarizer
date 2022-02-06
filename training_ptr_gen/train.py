@@ -99,8 +99,10 @@ class Train(object):
         for di in range(min(max_dec_len, config.max_dec_steps)):
             y_t_1 = dec_batch[:, di]  # Teacher forcing
 
-            if config.is_esa:
+            if config.is_esa and config.is_lsa:
                 r_i = torch.cat((r_i,e_i), 2)
+            elif config.is_esa and not config.is_lsa:
+                r_i = e_i
 
             # Decoder step
             final_dist, s_t_1,  c_t_1, attn_dist, p_gen, next_coverage = self.model.decoder(
