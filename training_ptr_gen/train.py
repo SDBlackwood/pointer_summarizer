@@ -58,6 +58,10 @@ class Train(object):
         self.model = Model(model_file_path)
 
         params = list(self.model.encoder.parameters()) + list(self.model.decoder.parameters()) + list(self.model.reduce_state.parameters())
+
+        for i, p in enumerate(params):
+            print(i, p.device)
+
         initial_lr = config.lr_coverage if config.is_coverage else config.lr
         self.optimizer = Adagrad(params, lr=initial_lr, initial_accumulator_value=config.adagrad_init_acc)
 
