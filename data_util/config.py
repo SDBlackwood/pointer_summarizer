@@ -16,8 +16,8 @@ log_root = os.path.join(root_dir, os.getenv('log_root'))
 # Hyperparameters
 hidden_dim = 128
 emb_dim= 64
-batch_size= 16
-max_enc_steps=200
+batch_size= 8
+max_enc_steps=100
 max_dec_steps=50
 beam_size=4
 min_dec_steps=35
