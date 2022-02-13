@@ -41,8 +41,8 @@ class ExplictStructuredAttention(nn.Module):
 
         structure = torch.unsqueeze(structure, 2).expand(input.size())
         if self.use_cuda:
-            structure.to("cuda")
-            input.to("cuda")
+            structure=structure.to("cuda")
+            input=input.to("cuda")
 
         u_i = torch.tanh(self.F_u(input))
         t_i = u_i * structure
