@@ -33,6 +33,7 @@ class Example(object):
     answer_index = []
     answer_votescore  = []
     answer_reputation  = []
+    # Loop the answers and find the votescore and reputation 
     for i, answer in enumerate(answers):
       vote_score = re.findall(b'<v>(.+?)</v>', answer)[0].decode()
       reputation = re.findall(b'<r>(.+?)</r>', answer)[0].decode()
@@ -45,7 +46,7 @@ class Example(object):
           
       answer_words.extend(answer.split())
       
-    article_words = article.split()
+    article_words = answer_words
     if len(article_words) > config.max_enc_steps:
       article_words = article_words[:config.max_enc_steps]
       answer_index = answer_index[:config.max_enc_steps]
@@ -53,14 +54,15 @@ class Example(object):
       answer_reputation = answer_reputation[:config.max_enc_steps]
 
     if len(article_words) < config.max_enc_steps:
-      for i in range(len(article_words), config.max_enc_steps):
-        article_words[i] = -1
-        answer_index[i] = -1
-        answer_votescore[i] = -1
-        answer_reputation[i] = -1
+      for j in range(len(article_words), config.max_enc_steps-1):
+        article_words.append(b'[PAD]')
+        answer_index.append(answer_count)
+        answer_votescore.append(-1)
+        answer_reputation.append(-1)
       
     self.enc_len = len(article_words) # store the length after truncation but before padding
     self.enc_input = [vocab.word2id(w) for w in article_words] # list of word ids; OOVs are represented by the id for UNK token
+
 
     self.answer_index = answer_index
     self.answer_votescore = answer_votescore
@@ -153,7 +155,12 @@ class Batch(object):
     self.enc_lens = np.zeros((self.batch_size), dtype=np.int32)
     self.enc_padding_mask = np.zeros((self.batch_size, max_enc_seq_len), dtype=np.float32)
 
+    for i, x in enumerate(example_list):
+        if (len(x.answer_index) > 400):
+              print(x, i)
+
     self.answer_index = torch.tensor([x.answer_index for x in example_list], dtype=torch.int32)
+
     self.answer_votescore = torch.tensor([x.answer_votescore for x in example_list], dtype=torch.int32)
     self.answer_reputation = torch.tensor([x.answer_reputation for x in example_list], dtype=torch.int32)
 
