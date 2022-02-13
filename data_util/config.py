@@ -17,8 +17,8 @@ log_root = os.path.join(root_dir, os.getenv('log_root'))
 hidden_dim = 256
 emb_dim= 64
 batch_size= 8
-max_enc_steps=200
-max_dec_steps=50
+max_enc_steps=400
+max_dec_steps=100
 beam_size=4
 min_dec_steps=35
 vocab_size=50000
@@ -36,7 +36,7 @@ is_esa = True
 cov_loss_wt = 1.0
 
 eps = 1e-12
-max_iterations = 5000
+max_iterations = 1000
 early_stopping = 0
 
 use_gpu=True

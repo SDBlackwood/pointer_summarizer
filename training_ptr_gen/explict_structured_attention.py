@@ -38,7 +38,6 @@ class ExplictStructuredAttention(nn.Module):
 
     def forward(self, input, structure): 
 
-
         structure = torch.unsqueeze(structure, 2).expand(input.size())
         if self.use_cuda:
             structure=structure.to("cuda")
