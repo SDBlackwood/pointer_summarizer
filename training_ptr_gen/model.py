@@ -182,7 +182,7 @@ class Attention(nn.Module):
             W_r is the linear layer which is combined with r_i, the structural infused hidden representation
             """
             self.W_r = nn.Linear(
-                in_features = attention_dimension, 
+                in_features = attention_dimension * 2, 
                 out_features = config.hidden_dim * 2, 
                 bias=False
             )
@@ -440,15 +440,15 @@ class Model(nn.Module):
         # Encoder is BiLSTM so there are 2 rows
         s_t_1 = self.reduce_state(encoder_hidden)
 
+        if config.is_esa and config.is_lsa:
+            r_i = torch.cat((r_i,e_i), 2)
+        elif config.is_esa and not config.is_lsa:
+            r_i = e_i
+
         # Decoder Section
         step_losses = []
         for di in range(min(max_dec_len, config.max_dec_steps)):
             y_t_1 = dec_batch[:, di]  # Teacher forcing
-
-            if config.is_esa and config.is_lsa:
-                r_i = torch.cat((r_i,e_i), 2)
-            elif config.is_esa and not config.is_lsa:
-                r_i = e_i
 
             # Decoder step
             final_dist, s_t_1,  c_t_1, attn_dist, p_gen, next_coverage = self.decoder(

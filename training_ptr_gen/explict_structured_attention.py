@@ -27,24 +27,24 @@ class ExplictStructuredAttention(nn.Module):
         self.use_cuda  = config.use_gpu and torch.cuda.is_available()
 
         # (256, 256)
-        self.F_u = nn.Linear(self.hidden_dimension * 2, self.hidden_dimension* 2, bias=True)
+        self.F_u = nn.Linear(self.hidden_dimension * 2, 100, bias=True)
         torch.nn.init.xavier_uniform_(self.F_u.weight)
         nn.init.constant_(self.F_u.bias, 0)
 
         # (256, 256)
-        self.F_e = nn.Linear(self.hidden_dimension * 2, self.hidden_dimension* 2, bias=True)
+        self.F_e = nn.Linear(100, 100, bias=True)
         torch.nn.init.xavier_uniform_(self.F_e.weight)
         nn.init.constant_(self.F_e.bias, 0)
 
     def forward(self, input, structure): 
 
-        structure = torch.unsqueeze(structure, 2).expand(input.size())
+        structure = torch.unsqueeze(structure, 2).expand(torch.Size([8,100,100]))
         if self.use_cuda:
             structure=structure.to("cuda")
             input=input.to("cuda")
 
         u_i = torch.tanh(self.F_u(input))
         t_i = u_i * structure
-        e_i = torch.tanh(self.F_u(t_i))
+        e_i = torch.tanh(self.F_e(t_i))
 
         return e_i

@@ -21,7 +21,7 @@ max_enc_steps=100
 max_dec_steps=50
 beam_size=4
 min_dec_steps=35
-vocab_size=2500
+vocab_size=25000
 
 lr=0.15
 adagrad_init_acc=0.1
@@ -30,9 +30,9 @@ trunc_norm_init_std=1e-4
 max_grad_norm=2.0
 
 pointer_gen = True
-is_coverage = True
+is_coverage = False
 is_lsa = True
-is_esa = False
+is_esa = True
 cov_loss_wt = 1.0
 
 eps = 1e-12
