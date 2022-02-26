@@ -32,7 +32,7 @@ max_grad_norm=2.0
 pointer_gen = True
 is_coverage = True
 is_lsa = True
-is_esa = True
+is_esa = False
 cov_loss_wt = 1.0
 
 eps = 1e-12

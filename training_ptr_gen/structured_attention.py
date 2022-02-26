@@ -53,7 +53,11 @@ class StructuredAttention(nn.Module):
 
         self.exparam = nn.Parameter(torch.Tensor(1,1,self.sem_dim_size))
         torch.nn.init.xavier_uniform_(self.exparam)
-        self.W_r = nn.Linear(3*self.sem_dim_size, self.sem_dim_size, bias=True)
+        self.W_r = nn.Linear(
+            3*self.sem_dim_size, 
+            self.sem_dim_size, 
+            bias=True
+        )
         torch.nn.init.xavier_uniform_(self.W_r.weight)
         nn.init.constant_(self.W_r.bias, 0)
         #mem.append(calc_mem(self.W_r))
@@ -203,17 +207,17 @@ class StructuredAttention(nn.Module):
 
         ssr = torch.cat([self.exparam.repeat(batch_size,1,1), e_i], 1)
         # Conxtext Vector gathered from possible parents of ui and ci
-        si = torch.bmm(a_ki, ssr)
+        s_i = torch.bmm(a_ki, ssr)
         # Conxtext Vector gathered from possible children
-        ci = torch.bmm(a_ik, e_i)
+        c_i = torch.bmm(a_ik, e_i)
         r_i = torch.tanh(
             self.W_r(
                     torch.cat(
-                        [e_i, si, ci],
+                        [e_i, s_i, c_i],
                         dim = 2
                     )
             )
         )
-        del e_i, a_ik, ssr, si, ci
+        del e_i, a_ik, ssr, s_i, c_i
 
         return r_i, a_ki

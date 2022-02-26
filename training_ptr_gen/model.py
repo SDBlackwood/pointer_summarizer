@@ -9,6 +9,9 @@ from BiLSTM import BiLSTMEncoder
 from numpy import random
 from data_util import config
 from data_util.utils import calc_mem, format_mem
+from torchinfo import summary
+from train_util import get_input_from_batch, get_output_from_batch
+
 
 import torch
 import torch.nn as nn
@@ -67,6 +70,7 @@ class Encoder(nn.Module):
 
         # (512, 512)
         self.W_h = nn.Linear(config.hidden_dim * 2,config.hidden_dim * 2, bias=False)
+        print(f"Encoder W_h {self.W_h}")
 
         self.sem_dim_size = 2*config.dim_sem
         self.token_hidden_size = 2*config.hidden_dim
@@ -173,9 +177,21 @@ class Attention(nn.Module):
         self.W_s = nn.Linear(config.hidden_dim * 2, config.hidden_dim * 2)
         self.v = nn.Linear(config.hidden_dim * 2, 1, bias=False)
         # Structural Attenion
-        if config.is_lsa:
-            self.W_r = nn.Linear(attention_dimension, config.hidden_dim * 2, bias=False)
-
+        if config.is_esa and config.is_lsa:
+            """
+            W_r is the linear layer which is combined with r_i, the structural infused hidden representation
+            """
+            self.W_r = nn.Linear(
+                in_features = attention_dimension, 
+                out_features = config.hidden_dim * 2, 
+                bias=False
+            )
+        elif config.is_lsa:
+            self.W_r = nn.Linear(
+                in_features = attention_dimension, 
+                out_features=config.hidden_dim * 2,
+                bias=False
+            )
     def forward(
         self,
         s_t_hat,
@@ -397,6 +413,12 @@ class Model(nn.Module):
         self.decoder = decoder
         self.reduce_state = reduce_state
 
+        # Print the model summary
+        summary(
+            self,
+            verbose=1
+        )
+
         if model_file_path is not None:
             state = torch.load(
                 model_file_path, map_location=lambda storage, location: storage)
@@ -404,3 +426,58 @@ class Model(nn.Module):
             self.decoder.load_state_dict(
                 state['decoder_state_dict'], strict=False)
             self.reduce_state.load_state_dict(state['reduce_state_dict'])
+
+    def forward(self,batch):
+        enc_batch, enc_padding_mask, enc_lens, enc_batch_extend_vocab, extra_zeros, c_t_1, coverage , answer_index, answer_votescore, answer_reputation = \
+            get_input_from_batch(batch, use_cuda)
+        dec_batch, dec_padding_mask, max_dec_len, dec_lens_var, target_batch = \
+            get_output_from_batch(batch, use_cuda)
+
+        # Encoder Section
+        encoder_outputs, encoder_feature, encoder_hidden, r_i, attention_matrix, e_i = self.encoder(enc_batch, enc_lens, enc_padding_mask, answer_index, answer_votescore, answer_reputation)
+
+        # Reduce State - inital decoder state ([1, 8, 256]),([1, 8, 256])
+        # Encoder is BiLSTM so there are 2 rows
+        s_t_1 = self.reduce_state(encoder_hidden)
+
+        # Decoder Section
+        step_losses = []
+        for di in range(min(max_dec_len, config.max_dec_steps)):
+            y_t_1 = dec_batch[:, di]  # Teacher forcing
+
+            if config.is_esa and config.is_lsa:
+                r_i = torch.cat((r_i,e_i), 2)
+            elif config.is_esa and not config.is_lsa:
+                r_i = e_i
+
+            # Decoder step
+            final_dist, s_t_1,  c_t_1, attn_dist, p_gen, next_coverage = self.decoder(
+                y_t_1, 
+                s_t_1, # decoder state 
+                encoder_outputs, 
+                encoder_feature, # Wh_hi
+                enc_padding_mask, # Array of 0s to denote pads
+                c_t_1, # inital context vector
+                extra_zeros, 
+                enc_batch_extend_vocab, 
+                coverage, 
+                di, # decoder step
+                r_i
+            )
+
+            target = target_batch[:, di]
+            gold_probs = torch.gather(final_dist, 1, target.unsqueeze(1)).squeeze()
+            step_loss = -torch.log(gold_probs + config.eps)
+            if config.is_coverage:
+                step_coverage_loss = torch.sum(torch.min(attn_dist, coverage), 1)
+                step_loss = step_loss + config.cov_loss_wt * step_coverage_loss
+                coverage = next_coverage
+                
+            step_mask = dec_padding_mask[:, di]
+            step_loss = step_loss * step_mask
+            step_losses.append(step_loss)
+
+        sum_losses = torch.sum(torch.stack(step_losses, 1), 1)
+        batch_avg_loss = sum_losses/dec_lens_var
+        loss = torch.mean(batch_avg_loss)
+        return loss

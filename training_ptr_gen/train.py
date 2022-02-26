@@ -80,60 +80,9 @@ class Train(object):
         return start_iter, start_loss
 
     def train_one_batch(self, batch):
-        enc_batch, enc_padding_mask, enc_lens, enc_batch_extend_vocab, extra_zeros, c_t_1, coverage , answer_index, answer_votescore, answer_reputation = \
-            get_input_from_batch(batch, use_cuda)
-        dec_batch, dec_padding_mask, max_dec_len, dec_lens_var, target_batch = \
-            get_output_from_batch(batch, use_cuda)
 
         self.optimizer.zero_grad()
-
-        # Encoder Section
-        encoder_outputs, encoder_feature, encoder_hidden, ri, attention_matrix, e_i = self.model.encoder(enc_batch, enc_lens, enc_padding_mask, answer_index, answer_votescore, answer_reputation)
-
-        # Reduce State - inital decoder state ([1, 8, 256]),([1, 8, 256])
-        # Encoder is BiLSTM so there are 2 rows
-        s_t_1 = self.model.reduce_state(encoder_hidden)
-
-        # Decoder Section
-        step_losses = []
-        for di in range(min(max_dec_len, config.max_dec_steps)):
-            y_t_1 = dec_batch[:, di]  # Teacher forcing
-
-            if config.is_esa and config.is_lsa:
-                r_i = torch.cat((r_i,e_i), 2)
-            elif config.is_esa and not config.is_lsa:
-                r_i = e_i
-
-            # Decoder step
-            final_dist, s_t_1,  c_t_1, attn_dist, p_gen, next_coverage = self.model.decoder(
-                y_t_1, 
-                s_t_1, # decoder state 
-                encoder_outputs, 
-                encoder_feature, # Wh_hi
-                enc_padding_mask, # Array of 0s to denote pads
-                c_t_1, # inital context vector
-                extra_zeros, 
-                enc_batch_extend_vocab, 
-                coverage, 
-                di, # decoder step
-                ri
-            )
-
-            target = target_batch[:, di]
-            gold_probs = torch.gather(final_dist, 1, target.unsqueeze(1)).squeeze()
-            step_loss = -torch.log(gold_probs + config.eps)
-            if config.is_coverage:
-                step_coverage_loss = torch.sum(torch.min(attn_dist, coverage), 1)
-                step_loss = step_loss + config.cov_loss_wt * step_coverage_loss
-                coverage = next_coverage
-                
-            step_mask = dec_padding_mask[:, di]
-            step_loss = step_loss * step_mask
-            step_losses.append(step_loss)
-
-        sum_losses = torch.sum(torch.stack(step_losses, 1), 1)
-        batch_avg_loss = sum_losses/dec_lens_var
-        loss = torch.mean(batch_avg_loss)
+        loss = self.model(batch)
         loss.backward()
 
         self.norm = clip_grad_norm_(self.model.encoder.parameters(), config.max_grad_norm)
