@@ -47,6 +47,12 @@ class Example(object):
       answer_words.extend(answer.split())
       
     article_words = answer_words
+
+
+    file1 = open("total.txt", "a")  # append mode
+    file1.write(f"{len(article_words)}\n")
+    file1.close()
+
     if len(article_words) > config.max_enc_steps:
       article_words = article_words[:config.max_enc_steps]
       answer_index = answer_index[:config.max_enc_steps]

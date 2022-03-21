@@ -19,7 +19,7 @@ emb_dim= 64
 batch_size= 8
 max_enc_steps=100
 max_dec_steps=50
-beam_size=4
+beam_size=8
 min_dec_steps=35
 vocab_size=25000
 
@@ -31,8 +31,8 @@ max_grad_norm=2.0
 
 pointer_gen = True
 is_coverage = False
-is_lsa = True
-is_esa = True
+is_lsa = False
+is_esa = False
 cov_loss_wt = 1.0
 
 eps = 1e-12
