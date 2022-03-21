@@ -22,6 +22,7 @@
 ├── start_train.sh                      -- Script to train the model 
 ├── tests
 │   └── test_train.py
+├── log                                 -- Generated Models and Decoded Outputs 
 └── training_ptr_gen
     ├── decode.py                       
     ├── eval.py
