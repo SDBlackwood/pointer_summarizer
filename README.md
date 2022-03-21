@@ -23,12 +23,12 @@
 ├── tests
 │   └── test_train.py
 └── training_ptr_gen
-    ├── decode.py
+    ├── decode.py                       
     ├── eval.py
-    ├── explict_structured_attention.py
-    ├── model.py
-    ├── structured_attention.py
-    ├── train.py
+    ├── explict_structured_attention.py -- Explict Structural Attenion Code
+    ├── model.py                        -- Main file containing Pytorch model code
+    ├── structured_attention.py         -- Latent structural attenion code
+    ├── train.py                        -- Training code
     └── train_util.py
 ```
 ## PGN = Pointer Generator Network
