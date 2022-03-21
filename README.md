@@ -1,65 +1,87 @@
-pytorch implementation of *[Get To The Point: Summarization with Pointer-Generator Networks](https://arxiv.org/abs/1704.04368)*
+# MSc Data Science Masters 
 
-Train with pointer generation + coverage loss enabled 
---------------------------------------------
-After training for 100k iterations with coverage loss enabled (batch size 8)
+## Improving Answer Summary Quality in Community Question Answering Systems using Metadata Represented via Structural Attention and Neural Abstractive Summarization
 
 ```
+── data                                 -- Relates to the data generation script                                             
+│   └── generator
+│       ├── config.py
+│       ├── document.py
+│       ├── findImportantSentences.py
+│       ├── main.py
+│       ├── parser.py
+│       ├── pointerDataset.py
+├── data_util                           -- Config and utils for the network
+│   ├── batcher.py
+│   ├── config.py
+│   ├── data.py
+|   ├── determine_mean_answer_length.py
+|   ├── total_answer_lengths.txt
+│   └── utils.py
+├── start_decode.sh                     -- Script to generate outputs and create ROUGE scores
+├── start_train.sh                      -- Script to train the model 
+├── tests
+│   └── test_train.py
+└── training_ptr_gen
+    ├── decode.py
+    ├── eval.py
+    ├── explict_structured_attention.py
+    ├── model.py
+    ├── structured_attention.py
+    ├── train.py
+    └── train_util.py
+```
+## PGN = Pointer Generator Network
+
+
 ROUGE-1:
-rouge_1_f_score: 0.3907 with confidence interval (0.3885, 0.3928)
-rouge_1_recall: 0.4434 with confidence interval (0.4410, 0.4460)
-rouge_1_precision: 0.3698 with confidence interval (0.3672, 0.3721)
+rouge_1_f_score: 0.1279 with confidence interval (0.0951, 0.1581)
+rouge_1_recall: 0.0817 with confidence interval (0.0610, 0.1012)
+rouge_1_precision: 0.3081 with confidence interval (0.2326, 0.3733)
 
 ROUGE-2:
-rouge_2_f_score: 0.1697 with confidence interval (0.1674, 0.1720)
-rouge_2_recall: 0.1920 with confidence interval (0.1894, 0.1945)
-rouge_2_precision: 0.1614 with confidence interval (0.1590, 0.1636)
+rouge_2_f_score: 0.0108 with confidence interval (0.0028, 0.0193)
+rouge_2_recall: 0.0069 with confidence interval (0.0018, 0.0123)
+rouge_2_precision: 0.0257 with confidence interval (0.0074, 0.0448)
 
 ROUGE-l:
-rouge_l_f_score: 0.3587 with confidence interval (0.3565, 0.3608)
-rouge_l_recall: 0.4067 with confidence interval (0.4042, 0.4092)
-rouge_l_precision: 0.3397 with confidence interval (0.3371, 0.3420)
-```
+rouge_l_f_score: 0.1130 with confidence interval (0.0834, 0.1411)
+rouge_l_recall: 0.0721 with confidence interval (0.0532, 0.0897)
+rouge_l_precision: 0.2728 with confidence interval (0.2002, 0.3382)
 
-![Alt text](learning_curve_coverage.png?raw=true "Learning Curve with coverage loss")
+## LSA - Latent Structura Attenion 
 
-Training with pointer generation enabled
---------------------------------------------
-
-After training for 500k iterations (batch size 8)
-
-```
 ROUGE-1:
-rouge_1_f_score: 0.3500 with confidence interval (0.3477, 0.3523)
-rouge_1_recall: 0.3718 with confidence interval (0.3693, 0.3745)
-rouge_1_precision: 0.3529 with confidence interval (0.3501, 0.3555)
+rouge_1_f_score: 0.0959 with confidence interval (0.0803, 0.1086)
+rouge_1_recall: 0.0681 with confidence interval (0.0559, 0.0773)
+rouge_1_precision: 0.1705 with confidence interval (0.1497, 0.1928)
 
 ROUGE-2:
-rouge_2_f_score: 0.1486 with confidence interval (0.1465, 0.1508)
-rouge_2_recall: 0.1573 with confidence interval (0.1551, 0.1597)
-rouge_2_precision: 0.1506 with confidence interval (0.1483, 0.1529)
+rouge_2_f_score: 0.0082 with confidence interval (0.0029, 0.0138)
+rouge_2_recall: 0.0058 with confidence interval (0.0021, 0.0097)
+rouge_2_precision: 0.0141 with confidence interval (0.0046, 0.0238)
 
 ROUGE-l:
-rouge_l_f_score: 0.3202 with confidence interval (0.3179, 0.3225)
-rouge_l_recall: 0.3399 with confidence interval (0.3374, 0.3426)
-rouge_l_precision: 0.3231 with confidence interval (0.3205, 0.3256)
-```
-![Alt text](learning_curve.png?raw=true "Learning Curve with pointer generation")
+rouge_l_f_score: 0.0808 with confidence interval (0.0659, 0.0972)
+rouge_l_recall: 0.0571 with confidence interval (0.0461, 0.0678)
+rouge_l_precision: 0.1452 with confidence interval (0.1166, 0.1737)
 
 
-How to run training:
---------------------------------------------
-1) Follow data generation instruction from https://github.com/abisee/cnn-dailymail
-2) Run start_train.sh, you might need to change some path and parameters in data_util/config.py
-3) For training run start_train.sh, for decoding run start_decode.sh, and for evaluating run run_eval.sh
 
-Note:
-* It is tested on pytorch 0.4 with python 2.7
-* You need to setup [pyrouge](https://github.com/andersjo/pyrouge) to get the rouge score
+## ESA - Explict Structura Attenion 
 
-Papaers using this code:
---------------------------------------------
-1) [Automatic Program Synthesis of Long Programs with a Learned Garbage Collector](http://papers.nips.cc/paper/7479-automatic-program-synthesis-of-long-programs-with-a-learned-garbage-collector) https://github.com/amitz25/PCCoder
-2) [Automatic Fact-guided Sentence Modification](https://arxiv.org/abs/1909.13838)
+ROUGE-1:
+rouge_1_f_score: 0.1431 with confidence interval (0.1102, 0.1753)
+rouge_1_recall: 0.0897 with confidence interval (0.0679, 0.1102)
+rouge_1_precision: 0.3679 with confidence interval (0.2858, 0.4438)
 
+ROUGE-2:
+rouge_2_f_score: 0.0110 with confidence interval (0.0029, 0.0197)
+rouge_2_recall: 0.0069 with confidence interval (0.0018, 0.0123)
+rouge_2_precision: 0.0279 with confidence interval (0.0083, 0.0481)
+
+ROUGE-l:
+rouge_l_f_score: 0.1210 with confidence interval (0.0931, 0.1481)
+rouge_l_recall: 0.0757 with confidence interval (0.0582, 0.0925)
+rouge_l_precision: 0.3125 with confidence interval (0.2435, 0.3782)
 
