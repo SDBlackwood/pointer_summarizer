@@ -1,0 +1,6 @@
+I want to reframe your question.
+Do n't think about switching , think about adding.
+In data science you 'll be able to go very far with either python or r but you 'll go farthest with both.
+Python and r integrate very well , thanks to the reticulate package.
+I often tidy data in r because it is easier for me , train a model in python to benefit from superior speed and visualize the outcomes in r in beautiful ggplot all in one notebook!
+If you already know r there is no sense in abandoning it , use it where sensible and easy to you.

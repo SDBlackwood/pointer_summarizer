@@ -1,7 +1,5 @@
 *.pyc 
 *.bin
-log/*
-log
 environment
 .pytest_cache/
 .env

@@ -1,0 +1,4 @@
+Commonsense knowledge is the collection of premises that everyone , in a certain context ( hence common sense knowledge might be a function of the context ) , takes for granted.
+There would exist a lot of miscommunication between a human and an AI if the AI did not possess common sense knowledge.
+For example , every human ( almost since its birth ) has a mechanism for reasoning about naive physics , such as space , time , and physical interactions.
+See section D of AI-Complete , AI-Hard , or AI-Easy â€ “ Classification of Problems in AI ( 2012 ) by RomanV.

@@ -1,0 +1,3 @@
+I 'm going to assume that by free will , you mean something like the philosophical concept of libertarian free will , which is defended by philosophers like Robert Kane.
+I think most AI researchers do n't worry too much about these issues , but Turing actually addresses them in his paper right at the start of the field , Computing Machinary and Intelligence.
+Turing suggests the `` Anthropic Principal '' : we should n't assume that we 're special , because the earth is n't in a special place in the galaxy , or in the universe , and we have pretty compelling evidence that we 're an evolved version of other animals around us , but some groups ( e.g.

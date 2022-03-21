@@ -1,0 +1,3 @@
+Since a neural network does iteratively learn its own weights I assume you mean the structure of the neural network - the number of layers and nodes per layer.
+Google wrote a blog where they used machine learning to explore the architecture of a neural network calling it the AutoML project where the blog claimed `` To make this process of designing machine learning models much more accessible , weâ€™ve been exploring ways to automate the design of machine learning models.
+'' It was found that AutoML can design small neural networks that perform on par with neural networks designed by human experts , but these results were constrained to small academic datasets like CIFAR-10 , and Penn Treebank.
