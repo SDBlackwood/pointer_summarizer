@@ -109,11 +109,16 @@ class BeamSearch(object):
 
     def beam_search(self, batch):
         #batch should have only one example
-        enc_batch, enc_padding_mask, enc_lens, enc_batch_extend_vocab, extra_zeros, c_t_0, coverage_t_0 = \
+        enc_batch, enc_padding_mask, enc_lens, enc_batch_extend_vocab, extra_zeros, c_t_0, coverage_t_0, answer_index, answer_votescore, answer_reputation = \
             get_input_from_batch(batch, use_cuda)
 
-        encoder_outputs, encoder_feature, encoder_hidden, ri, attention_matrix = self.model.encoder(enc_batch, enc_lens, enc_padding_mask)
+        encoder_outputs, encoder_feature, encoder_hidden, r_i, attention_matrix, e_i = self.model.encoder(enc_batch, enc_lens, enc_padding_mask, answer_index, answer_votescore, answer_reputation)        
         s_t_0 = self.model.reduce_state(encoder_hidden)
+
+        if config.is_esa and config.is_lsa:
+            r_i = torch.cat((r_i,e_i), 2)
+        elif config.is_esa and not config.is_lsa:
+            r_i = e_i
 
         dec_h, dec_c = s_t_0 # 1 x 2*hidden_size
         dec_h = dec_h.squeeze()
@@ -157,9 +162,11 @@ class BeamSearch(object):
                     all_coverage.append(h.coverage)
                 coverage_t_1 = torch.stack(all_coverage, 0)
 
+
+
             final_dist, s_t, c_t, attn_dist, p_gen, coverage_t = self.model.decoder(y_t_1, s_t_1,
                                                         encoder_outputs, encoder_feature, enc_padding_mask, c_t_1,
-                                                        extra_zeros, enc_batch_extend_vocab, coverage_t_1, steps)
+                                                        extra_zeros, enc_batch_extend_vocab, coverage_t_1, steps, r_i)
             log_probs = torch.log(final_dist)
             topk_log_probs, topk_ids = torch.topk(log_probs, config.beam_size * 2)
 

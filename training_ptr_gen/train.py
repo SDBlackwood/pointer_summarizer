@@ -124,6 +124,16 @@ if __name__ == '__main__':
                         required=False,
                         default=None,
                         help="Model file for retraining (default: None).")
+    parser.add_argument("-lsa",
+                        dest="is_lsa", 
+                        required=False,
+                        default=None,
+                        help="Model file for retraining (default: None).")
+    parser.add_argument("-esa",
+                        dest="is_esa", 
+                        required=False,
+                        default=None,
+                        help="Model file for retraining (default: None).")
     args = parser.parse_args()
     
     train_processor = Train()

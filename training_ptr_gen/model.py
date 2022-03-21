@@ -318,6 +318,8 @@ class Decoder(nn.Module):
             h_decoder, c_decoder = s_t_1
             s_t_hat = torch.cat((h_decoder.view(-1, config.hidden_dim), c_decoder.view(-1, config.hidden_dim)), 1)
 
+
+
             # `c_t` - context vector
             c_t, _, coverage_next, c_struct_t, a_struct_t = self.attention_network(
                 s_t_hat,
