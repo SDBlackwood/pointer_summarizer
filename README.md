@@ -31,9 +31,9 @@
     ├── train.py                        -- Training code
     └── train_util.py
 ```
-## PGN = Pointer Generator Network
+## PGN - Pointer Generator Network
 
-
+```
 ROUGE-1:
 rouge_1_f_score: 0.1279 with confidence interval (0.0951, 0.1581)
 rouge_1_recall: 0.0817 with confidence interval (0.0610, 0.1012)
@@ -48,9 +48,10 @@ ROUGE-l:
 rouge_l_f_score: 0.1130 with confidence interval (0.0834, 0.1411)
 rouge_l_recall: 0.0721 with confidence interval (0.0532, 0.0897)
 rouge_l_precision: 0.2728 with confidence interval (0.2002, 0.3382)
+```
 
 ## LSA - Latent Structura Attenion 
-
+```
 ROUGE-1:
 rouge_1_f_score: 0.0959 with confidence interval (0.0803, 0.1086)
 rouge_1_recall: 0.0681 with confidence interval (0.0559, 0.0773)
@@ -65,11 +66,11 @@ ROUGE-l:
 rouge_l_f_score: 0.0808 with confidence interval (0.0659, 0.0972)
 rouge_l_recall: 0.0571 with confidence interval (0.0461, 0.0678)
 rouge_l_precision: 0.1452 with confidence interval (0.1166, 0.1737)
-
-
+```
 
 ## ESA - Explict Structura Attenion 
 
+```
 ROUGE-1:
 rouge_1_f_score: 0.1431 with confidence interval (0.1102, 0.1753)
 rouge_1_recall: 0.0897 with confidence interval (0.0679, 0.1102)
@@ -84,4 +85,4 @@ ROUGE-l:
 rouge_l_f_score: 0.1210 with confidence interval (0.0931, 0.1481)
 rouge_l_recall: 0.0757 with confidence interval (0.0582, 0.0925)
 rouge_l_precision: 0.3125 with confidence interval (0.2435, 0.3782)
-
+```
