@@ -2,6 +2,8 @@
 
 ## Improving Answer Summary Quality in Community Question Answering Systems using Metadata Represented via Structural Attention and Neural Abstractive Summarization
 
+See the deployed version here https://colab.research.google.com/drive/18XBQ8jpKJlkY1rgkvNV41amIuY_uFe5k#scrollTo=6ASJf8_BeK7W
+
 ```
 ── data                                 -- Relates to the data generation script                                             
 │   └── generator
