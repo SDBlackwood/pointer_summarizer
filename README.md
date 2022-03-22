@@ -26,8 +26,7 @@ See the deployed version here https://colab.research.google.com/drive/18XBQ8jpKJ
 │   └── test_train.py
 ├── log                                 -- Generated Models and Decoded Outputs 
 └── training_ptr_gen
-    ├── decode.py                       
-    ├── eval.py
+    ├── decode.py                       -- Evaluation Code     
     ├── explict_structured_attention.py -- Explict Structural Attenion Code
     ├── model.py                        -- Main file containing Pytorch model code
     ├── structured_attention.py         -- Latent structural attenion code
