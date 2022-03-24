@@ -1,11 +1,8 @@
 """
-This code has been directly used from the below sourc.  
-All credit for this code goes to the authors.  
-https://github.com/vidhishanair/structured-text-representations/blob/master/models/modules/StructuredAttention.py
+Explict Structural Attention Code
 
-Example 
-self.sentence_structure_att = StructuredAttention(device, self.sem_dim_size, self.sent_hidden_size, bidirectional, py_version)
-self.document_structure_att = StructuredAttention(device, self.sem_dim_size, self.doc_hidden_size, bidirectional, py_version)
+Influnced by latent structural attention code written here
+https://github.com/vidhishanair/structured-text-representations/blob/master/models/modules/StructuredAttention.py
 
 
 Returns:
@@ -14,31 +11,35 @@ Returns:
 
 import torch.nn as nn
 import torch
-import torch.nn.functional as F
-import math 
-#from data_util.utils import calc_mem, format_mem
-
 class ExplictStructuredAttention(nn.Module):
     def __init__(self, hidden_dimension, config):
         super(ExplictStructuredAttention, self).__init__()
-        
         self.hidden_dimension = hidden_dimension;
-
         self.use_cuda  = config.use_gpu and torch.cuda.is_available()
 
-        # (256, 256)
+        """Linear layer for `u`
+        # (256, 100)
+        """
         self.F_u = nn.Linear(self.hidden_dimension * 2, 100, bias=True)
         torch.nn.init.xavier_uniform_(self.F_u.weight)
         nn.init.constant_(self.F_u.bias, 0)
 
-        # (256, 256)
+        """Linear layer for `e`
+        """
         self.F_e = nn.Linear(100, 100, bias=True)
         torch.nn.init.xavier_uniform_(self.F_e.weight)
         nn.init.constant_(self.F_e.bias, 0)
 
     def forward(self, input, structure): 
+        """Forward function called at each step of the decoder
 
+        Attributes
+        ---------
+        input: torch.Tensor - torch.Size([batch_size,structural_dimension_size,hidden_dimension_size])
+        structure: torch.Tensor - tensor of torch.Size(batch_size,structural_dimension_size) e.g (8,100)
+        """
         structure = torch.unsqueeze(structure, 2).expand(torch.Size([8,100,100]))
+        # Set to cuda if we are using
         if self.use_cuda:
             structure=structure.to("cuda")
             input=input.to("cuda")

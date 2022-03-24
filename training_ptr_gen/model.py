@@ -125,13 +125,19 @@ class Encoder(nn.Module):
         encoder_feature = encoder_outputs.view(-1, 2*config.hidden_dim)
         encoder_feature = self.W_h(encoder_feature)
 
-        # Structural Encoder Attenion Network - returns structured infused `r_i` for `i` timestep
-        # We need the Wr.r_i here W
+        # 
         r_i, a_jk = None, None
+        """If `is_lsa` (Latent Structral Attention) 
+        set in config then calculate `e_i`
+        Returns structured infused `r_i` for `i` timestep
+        """
         if config.is_lsa:
             r_i, a_jk = self.structure_attention(encoder_outputs)
 
         e_i = None
+        """If `is_esa` (Explict Structral Attention) 
+        set in config then calculate `e_i`
+        """
         if config.is_esa:
             e_i = self.explict_structure_attention(encoder_outputs, answer_votescore + answer_reputation)
 
@@ -156,17 +162,6 @@ class ReduceState(nn.Module):
 
         # h, c dim = 1 x b x hidden_dim
         return (hidden_reduced_h.unsqueeze(0), hidden_reduced_c.unsqueeze(0))
-
-def calc_mem(layer):
-    size_bytes = ((linear.in_features * linear.out_features) * (4 / (1024^3)))*2
-    if size_bytes == 0:
-           return "0B"
-    size_name = ("B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB")
-    i = int(math.floor(math.log(size_bytes, 1024)))
-    p = math.pow(1024, i)
-    s = round(size_bytes / p, 2)
-    print("%s %s" % (s, size_name[i]))
-    return "%s %s" % (s, size_name[i])
 
 class Attention(nn.Module):
     def __init__(self, attention_dimension):
